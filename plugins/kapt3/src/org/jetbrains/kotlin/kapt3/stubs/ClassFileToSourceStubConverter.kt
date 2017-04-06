@@ -190,6 +190,11 @@ class ClassFileToSourceStubConverter(
     private fun convertClass(clazz: ClassNode, packageFqName: String, isTopLevel: Boolean): JCClassDecl? {
         if (isSynthetic(clazz.access)) return null
 
+        if (checkIfShouldBeIgnored(clazz)) {
+            kaptContext.logger.warn(clazz.name.replace('/', '.') + " will be ignored because it is impossible to represent it in Java")
+            return null
+        }
+
         val descriptor = kaptContext.origins[clazz]?.descriptor as? DeclarationDescriptor ?: return null
         val isNested = (descriptor as? ClassDescriptor)?.isNested ?: false
         val isInner = isNested && (descriptor as? ClassDescriptor)?.isInner ?: false
@@ -253,7 +258,7 @@ class ClassFileToSourceStubConverter(
             }?.desc ?: "()Z")
 
             val args = mapJList(constructorArguments.drop(2)) { convertLiteralExpression(getDefaultValue(it)) }
-            
+
             val def = data.correspondingClass?.let { convertClass(it, packageFqName, false) }
 
             convertField(data.field, packageFqName, treeMaker.NewClass(
@@ -281,11 +286,6 @@ class ClassFileToSourceStubConverter(
             if (enumValuesData.any { it.innerClass == innerClass }) return@mapJList null
             if (innerClass.outerName != clazz.name) return@mapJList null
             val innerClassNode = kaptContext.compiledClasses.firstOrNull { it.name == innerClass.name } ?: return@mapJList null
-            if (checkIfInnerClassNameConflictsWithOuter(innerClassNode, clazz)) {
-                kaptContext.logger.warn(innerClassNode.name.replace('/', '.').replace('$', '.')
-                        + " will be ignored (name is clashing with the outer class name)")
-                return@mapJList null
-            }
             convertClass(innerClassNode, packageFqName, false)
         }
 
@@ -307,7 +307,7 @@ class ClassFileToSourceStubConverter(
 
         val internalName = type.internalName
         val clazz = kaptContext.compiledClasses.firstOrNull { it.name == internalName } ?: return false
-        return checkIfInnerClassNameConflictsWithOuter(clazz)
+        return checkIfShouldBeIgnored(clazz)
     }
 
     private fun findContainingClassNode(clazz: ClassNode): ClassNode? {
@@ -316,15 +316,21 @@ class ClassFileToSourceStubConverter(
     }
 
     // Java forbids outer and inner class names to be the same. Check if the names are different
-    private tailrec fun checkIfInnerClassNameConflictsWithOuter(
+    private tailrec fun checkIfShouldBeIgnored(
             clazz: ClassNode,
             outerClass: ClassNode? = findContainingClassNode(clazz)
     ): Boolean {
+        // Both package paths and inner classes in kapt are separated with '/'
+        if (clazz.name.split('/').any { it in JAVA_KEYWORDS }) {
+            // Name should not contains Java identifiers
+            return true
+        }
+
         if (outerClass == null) return false
         if (clazz.simpleName == outerClass.simpleName) return true
         // Try to find the containing class for outerClassNode (to check the whole tree recursively)
         val containingClassForOuterClass = findContainingClassNode(outerClass) ?: return false
-        return checkIfInnerClassNameConflictsWithOuter(clazz, containingClassForOuterClass)
+        return checkIfShouldBeIgnored(clazz, containingClassForOuterClass)
     }
 
     private val ClassNode.simpleName: String
