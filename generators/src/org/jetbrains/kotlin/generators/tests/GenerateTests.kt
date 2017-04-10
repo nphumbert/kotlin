@@ -341,7 +341,11 @@ fun main(args: Array<String>) {
         }
 
         testClass<AbstractCompileJavaAgainstKotlinTest> {
-            model("compileJavaAgainstKotlin")
+            model("compileJavaAgainstKotlin/withoutJavac")
+        }
+
+        testClass<AbstractJavacBasedCompileJavaAgainstKotlinTest> {
+            model("compileJavaAgainstKotlin/withJavac")
         }
 
         testClass<AbstractCompileKotlinAgainstJavaTest> {
