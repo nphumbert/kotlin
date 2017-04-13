@@ -257,6 +257,7 @@ karma {
 
     frameworks = ['qunit']
     browsers = ['PhantomJS']
+    logLevel = "DEBUG"
 
     if (project.hasProperty("teamcity")) {
         reporters = ['teamcity']
