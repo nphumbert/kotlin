@@ -48,6 +48,12 @@ public class JavaAgainstKotlinBinariesCheckerTestGenerated extends AbstractJavaA
         doTest(fileName);
     }
 
+    @TestMetadata("Bridges.kt")
+    public void testBridges() throws Exception {
+        String fileName = KotlinTestUtils.navigationMetadata("idea/testData/kotlinAndJavaChecker/javaAgainstKotlin/Bridges.kt");
+        doTest(fileName);
+    }
+
     @TestMetadata("ClassObjects.kt")
     public void testClassObjects() throws Exception {
         String fileName = KotlinTestUtils.navigationMetadata("idea/testData/kotlinAndJavaChecker/javaAgainstKotlin/ClassObjects.kt");
