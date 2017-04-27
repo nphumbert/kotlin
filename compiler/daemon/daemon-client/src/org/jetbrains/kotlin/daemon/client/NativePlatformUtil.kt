@@ -19,6 +19,7 @@ package org.jetbrains.kotlin.daemon.client
 import net.rubygrapefruit.platform.Native
 import net.rubygrapefruit.platform.NativeException
 import net.rubygrapefruit.platform.ProcessLauncher
+import org.jetbrains.kotlin.daemon.common.DaemonReportCategory
 import java.io.IOException
 
 internal fun launchWithNativePlatformLauncher(processBuilder: ProcessBuilder): Process {
@@ -30,3 +31,17 @@ internal fun launchWithNativePlatformLauncher(processBuilder: ProcessBuilder): P
         throw IOException(e)
     }
 }
+
+fun launchProcessWithFallback(processBuilder: ProcessBuilder, reportingTargets: DaemonReportingTargets, reportingSource: String = "process launcher"): Process =
+        try {
+            launchWithNativePlatformLauncher(processBuilder)
+        }
+        catch (e: IOException) {
+            reportingTargets.report(DaemonReportCategory.DEBUG, "Could not start process with native process launcher, falling back to ProcessBuilder#start (${e.cause})")
+            null
+        }
+        catch (e: NoClassDefFoundError) {
+            reportingTargets.report(DaemonReportCategory.DEBUG, "net.rubygrapefruit.platform library is not in the classpath, falling back to ProcessBuilder#start")
+            null
+        }
+        ?: processBuilder.start()
