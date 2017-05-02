@@ -37,7 +37,7 @@ class KaptTreeMaker(context: Context) : TreeMaker(context) {
     }
 
     fun FqName(internalOrFqName: String): JCTree.JCExpression {
-        val path = internalOrFqName.replace('/', '.').split('.')
+        val path = internalOrFqName.replace('/', '.').let { handleSpecialFqNames(it) }.split('.')
         assert(path.isNotEmpty())
         if (path.size == 1) return SimpleName(path.single())
 
@@ -46,6 +46,15 @@ class KaptTreeMaker(context: Context) : TreeMaker(context) {
             expr = Select(expr, name(path[index]))
         }
         return expr
+    }
+
+    private fun handleSpecialFqNames(fqName: String): String {
+        // Hard-coded in ImplementationBodyCodegen, KOTLIN_MARKER_INTERFACES
+        if (fqName == "kotlin.jvm.internal.markers.KMutableMap\$Entry") {
+            return fqName.replace('$', '.')
+        }
+
+        return fqName
     }
 
     fun convertBuiltinType(type: Type): JCTree.JCExpression? {
