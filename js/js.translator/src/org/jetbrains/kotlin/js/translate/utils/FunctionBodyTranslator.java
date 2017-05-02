@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
+ * Copyright 2010-2017 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,12 @@
 
 package org.jetbrains.kotlin.js.translate.utils;
 
+import com.intellij.psi.PsiElement;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns;
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor;
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor;
+import org.jetbrains.kotlin.descriptors.SourceElement;
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor;
 import org.jetbrains.kotlin.js.backend.ast.*;
 import org.jetbrains.kotlin.js.backend.ast.metadata.MetadataProperties;
@@ -32,6 +34,7 @@ import org.jetbrains.kotlin.js.translate.general.Translation;
 import org.jetbrains.kotlin.js.translate.reference.ReferenceTranslator;
 import org.jetbrains.kotlin.psi.KtDeclarationWithBody;
 import org.jetbrains.kotlin.psi.KtExpression;
+import org.jetbrains.kotlin.resolve.source.KotlinSourceElementKt;
 import org.jetbrains.kotlin.types.KotlinType;
 
 import java.util.ArrayList;
@@ -86,6 +89,11 @@ public final class FunctionBodyTranslator extends AbstractTranslator {
             JsStatement assignStatement = assignment(jsNameRef, defaultValue).makeStmt();
             JsStatement thenStatement = JsAstUtils.mergeStatementInBlockIfNeeded(assignStatement, defaultArgBlock);
             JsBinaryOperation checkArgIsUndefined = equality(jsNameRef, Namer.getUndefinedExpression());
+            SourceElement source = valueParameter.getSource();
+            PsiElement psi = KotlinSourceElementKt.getPsi(source);
+            if (psi != null) {
+                checkArgIsUndefined.source(psi);
+            }
             JsIf jsIf = JsAstUtils.newJsIf(checkArgIsUndefined, thenStatement);
             result.add(jsIf);
         }
