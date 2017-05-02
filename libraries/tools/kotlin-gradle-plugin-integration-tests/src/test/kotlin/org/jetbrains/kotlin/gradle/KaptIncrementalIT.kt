@@ -75,6 +75,37 @@ abstract class KaptIncrementalBaseIT(val shouldUseStubs: Boolean, val useKapt3: 
     }
 
     @Test
+    fun testChangeFunctionBodyWithoutChangingSignature() {
+        val project = getProject()
+
+        project.build("build") {
+            assertSuccessful()
+            checkStubUsage()
+            checkGenerated(*annotatedElements)
+            checkNotGenerated("notAnnotatedFun")
+            assertContains("foo.ATest PASSED")
+        }
+
+        val utilKt = project.projectDir.getFileByName("util.kt")
+        utilKt.modify { oldContent ->
+            oldContent.replace("2 * 2 == 4", "2 * 2 == 5")
+        }
+
+        project.build("build") {
+            assertSuccessful()
+            checkStubUsage()
+
+            if (useKapt3) {
+                assertNotContains(":kaptGenerateStubsKotlin UP-TO-DATE")
+                assertContains(":kaptKotlin UP-TO-DATE")
+            }
+            else {
+                assertKapt3FullyExecuted()
+            }
+        }
+    }
+
+    @Test
     fun testAddAnnotatedElement() {
         val project = getProject()
         project.build("build") {

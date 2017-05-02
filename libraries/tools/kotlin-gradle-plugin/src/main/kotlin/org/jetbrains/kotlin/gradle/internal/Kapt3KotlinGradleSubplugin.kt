@@ -261,7 +261,13 @@ class Kapt3KotlinGradleSubplugin : KotlinGradleSubplugin<KotlinCompile> {
         kaptTask.classesDir = classesOutputDir
 
         kaptTask.mapSource {
-            kotlinCompile.source.filter { it.extension == "java" && !kaptTask.isInsideDestinationDirs(it) }.asFileTree
+            val sourcesFromKotlinTask = kotlinCompile.source
+                    .filter { it.extension == "java" && !kaptTask.isInsideDestinationDirs(it) }
+                    .asFileTree
+
+            val stubSources = project.fileTree(kaptTask.stubsDir)
+
+            sourcesFromKotlinTask + stubSources
         }
 
         kaptTask.dependsOn(kaptGenerateStubsTask)
