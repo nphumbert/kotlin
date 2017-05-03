@@ -45,7 +45,7 @@ import org.jetbrains.kotlin.name.ClassId;
 import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.platform.JavaToKotlinClassMap;
-import org.jetbrains.kotlin.platform.JavaToKotlinClassMap.PlatformCollection;
+import org.jetbrains.kotlin.platform.JavaToKotlinClassMap.PlatformMutabilityMapping;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.resolve.BindingContext;
 import org.jetbrains.kotlin.resolve.DelegationResolver;
@@ -74,7 +74,6 @@ import org.jetbrains.org.objectweb.asm.commons.Method;
 
 import java.util.*;
 
-import static org.jetbrains.kotlin.builtins.KotlinBuiltIns.FQ_NAMES;
 import static org.jetbrains.kotlin.codegen.AsmUtil.*;
 import static org.jetbrains.kotlin.codegen.CodegenUtilKt.isGenericToArray;
 import static org.jetbrains.kotlin.codegen.CodegenUtilKt.isNonGenericToArray;
@@ -262,12 +261,12 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
     private static final Map<FqName, String> KOTLIN_MARKER_INTERFACES = new HashMap<>();
 
     static {
-        for (PlatformCollection platformCollection : JavaToKotlinClassMap.INSTANCE.getPlatformCollections()) {
+        for (PlatformMutabilityMapping platformMutabilityMapping : JavaToKotlinClassMap.INSTANCE.getMutabilityMappings()) {
             KOTLIN_MARKER_INTERFACES.put(
-                    platformCollection.getKotlinReadOnly().asSingleFqName(),
+                    platformMutabilityMapping.getKotlinReadOnly().asSingleFqName(),
                     "kotlin/jvm/internal/markers/KMappedMarker");
 
-            ClassId mutableClassId = platformCollection.getKotlinMutable();
+            ClassId mutableClassId = platformMutabilityMapping.getKotlinMutable();
             KOTLIN_MARKER_INTERFACES.put(
                     mutableClassId.asSingleFqName(),
                     "kotlin/jvm/internal/markers/K" + mutableClassId.getRelativeClassName().asString().replace(".", "$")
