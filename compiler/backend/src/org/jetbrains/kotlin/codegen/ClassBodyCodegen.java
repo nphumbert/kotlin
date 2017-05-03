@@ -101,7 +101,7 @@ public abstract class ClassBodyCodegen extends MemberCodegen<KtPureClassOrObject
             genSyntheticClassOrObject((SyntheticClassOrObjectDescriptor) companionObjectDescriptor);
         }
 
-        if (generateNonClassMembers) {
+        if (state.getClassBuilderMode() != ClassBuilderMode.LIGHT_CLASSES) {
             generateBridges();
         }
     }

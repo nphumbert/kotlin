@@ -51,6 +51,7 @@ import org.jetbrains.kotlin.resolve.DescriptorUtils;
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt;
 import org.jetbrains.kotlin.resolve.calls.model.*;
 import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt;
+import org.jetbrains.kotlin.resolve.jvm.JvmClassName;
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmDeclarationOrigin;
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmDeclarationOriginKt;
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmClassSignature;
@@ -307,15 +308,23 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
 
         for (KotlinType supertype : descriptor.getTypeConstructor().getSupertypes()) {
             if (isJvmInterface(supertype.getConstructor().getDeclarationDescriptor())) {
-                sw.writeInterface();
-                Type jvmInterfaceType = typeMapper.mapSupertype(supertype, sw);
-                sw.writeInterfaceEnd();
-                String jvmInterfaceInternalName = jvmInterfaceType.getInternalName();
-                superInterfaces.add(jvmInterfaceInternalName);
-
                 FqName kotlinInterfaceName = DescriptorUtils.getFqName(supertype.getConstructor().getDeclarationDescriptor()).toSafe();
                 String kotlinMarkerInterfaceInternalName = KOTLIN_MARKER_INTERFACES.get(kotlinInterfaceName);
+
+                if (kotlinMarkerInterfaceInternalName == null || typeMapper.getClassBuilderMode() != ClassBuilderMode.LIGHT_CLASSES) {
+                    sw.writeInterface();
+                    Type jvmInterfaceType = typeMapper.mapSupertype(supertype, sw);
+                    sw.writeInterfaceEnd();
+                    String jvmInterfaceInternalName = jvmInterfaceType.getInternalName();
+
+                    superInterfaces.add(jvmInterfaceInternalName);
+                }
+
+
                 if (kotlinMarkerInterfaceInternalName != null) {
+                    if (typeMapper.getClassBuilderMode() == ClassBuilderMode.LIGHT_CLASSES) {
+                        kotlinMarkerInterfaces.add(JvmClassName.byFqNameWithoutInnerClasses(kotlinInterfaceName).getInternalName());
+                    }
                     kotlinMarkerInterfaces.add(kotlinMarkerInterfaceInternalName);
                 }
             }
@@ -358,9 +367,12 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
 
         generateFunctionsForDataClasses();
 
-        new CollectionStubMethodGenerator(typeMapper, descriptor).generate(functionCodegen, v);
+        if (state.getClassBuilderMode() != ClassBuilderMode.LIGHT_CLASSES) {
+            new CollectionStubMethodGenerator(typeMapper, descriptor).generate(functionCodegen, v);
 
-        generateToArray();
+            generateToArray();
+        }
+
 
         if (context.closure != null)
             genClosureFields(context.closure, v, typeMapper);
