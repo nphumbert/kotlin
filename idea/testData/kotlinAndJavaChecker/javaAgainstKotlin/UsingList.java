@@ -23,6 +23,10 @@ public class UsingList {
 
     public static class Extend2<E> extends MyList<E> {
 
+
+    }
+    public static class Extend3 extends AList {
+
     }
 
 }

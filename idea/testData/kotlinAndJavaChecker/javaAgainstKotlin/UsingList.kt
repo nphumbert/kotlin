@@ -89,3 +89,50 @@ abstract class MyList<E> : List<E> {
         TODO("not implemented")
     }
 }
+
+class A
+
+abstract class AList : List<A> {
+    override val size: Int
+        get() = TODO("not implemented")
+
+    override fun contains(element: A): Boolean {
+        TODO("not implemented")
+    }
+
+    override fun containsAll(elements: Collection<A>): Boolean {
+        TODO("not implemented")
+    }
+
+    override fun get(index: Int): A {
+        TODO("not implemented")
+    }
+
+    override fun indexOf(element: A): Int {
+        TODO("not implemented")
+    }
+
+    override fun isEmpty(): Boolean {
+        TODO("not implemented")
+    }
+
+    override fun iterator(): Iterator<A> {
+        TODO("not implemented")
+    }
+
+    override fun lastIndexOf(element: A): Int {
+        TODO("not implemented")
+    }
+
+    override fun listIterator(): ListIterator<A> {
+        TODO("not implemented")
+    }
+
+    override fun listIterator(index: Int): ListIterator<A> {
+        TODO("not implemented")
+    }
+
+    override fun subList(fromIndex: Int, toIndex: Int): List<A> {
+        TODO("not implemented")
+    }
+}
