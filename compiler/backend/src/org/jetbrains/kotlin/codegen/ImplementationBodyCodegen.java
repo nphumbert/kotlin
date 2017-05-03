@@ -41,8 +41,11 @@ import org.jetbrains.kotlin.incremental.components.NoLookupLocation;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.load.java.JvmAbi;
 import org.jetbrains.kotlin.load.java.descriptors.JavaClassDescriptor;
+import org.jetbrains.kotlin.name.ClassId;
 import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.name.Name;
+import org.jetbrains.kotlin.platform.JavaToKotlinClassMap;
+import org.jetbrains.kotlin.platform.JavaToKotlinClassMap.PlatformCollection;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.resolve.BindingContext;
 import org.jetbrains.kotlin.resolve.DelegationResolver;
@@ -257,24 +260,19 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
     }
 
     private static final Map<FqName, String> KOTLIN_MARKER_INTERFACES = new HashMap<>();
-    static {
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.iterator, "kotlin/jvm/internal/markers/KMappedMarker");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.iterable, "kotlin/jvm/internal/markers/KMappedMarker");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.collection, "kotlin/jvm/internal/markers/KMappedMarker");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.list, "kotlin/jvm/internal/markers/KMappedMarker");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.listIterator, "kotlin/jvm/internal/markers/KMappedMarker");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.set, "kotlin/jvm/internal/markers/KMappedMarker");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.map, "kotlin/jvm/internal/markers/KMappedMarker");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.mapEntry, "kotlin/jvm/internal/markers/KMappedMarker");
 
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.mutableIterator, "kotlin/jvm/internal/markers/KMutableIterator");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.mutableIterable, "kotlin/jvm/internal/markers/KMutableIterable");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.mutableCollection, "kotlin/jvm/internal/markers/KMutableCollection");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.mutableList, "kotlin/jvm/internal/markers/KMutableList");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.mutableListIterator, "kotlin/jvm/internal/markers/KMutableListIterator");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.mutableSet, "kotlin/jvm/internal/markers/KMutableSet");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.mutableMap, "kotlin/jvm/internal/markers/KMutableMap");
-        KOTLIN_MARKER_INTERFACES.put(FQ_NAMES.mutableMapEntry, "kotlin/jvm/internal/markers/KMutableMap$Entry");
+    static {
+        for (PlatformCollection platformCollection : JavaToKotlinClassMap.INSTANCE.getPlatformCollections()) {
+            KOTLIN_MARKER_INTERFACES.put(
+                    platformCollection.getKotlinReadOnly().asSingleFqName(),
+                    "kotlin/jvm/internal/markers/KMappedMarker");
+
+            ClassId mutableClassId = platformCollection.getKotlinMutable();
+            KOTLIN_MARKER_INTERFACES.put(
+                    mutableClassId.asSingleFqName(),
+                    "kotlin/jvm/internal/markers/K" + mutableClassId.getRelativeClassName().asString().replace(".", "$")
+            );
+        }
     }
 
     @NotNull
