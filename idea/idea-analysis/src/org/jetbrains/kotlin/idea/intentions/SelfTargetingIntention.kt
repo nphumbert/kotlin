@@ -19,8 +19,9 @@ package org.jetbrains.kotlin.idea.intentions
 import com.intellij.codeInsight.FileModificationService
 import com.intellij.codeInsight.daemon.HighlightDisplayKey
 import com.intellij.codeInsight.intention.IntentionAction
+import com.intellij.codeInspection.InspectionManager
 import com.intellij.codeInspection.LocalInspectionEP
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.extensions.Extensions
 import com.intellij.openapi.project.Project
@@ -30,8 +31,8 @@ import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
+import org.jetbrains.kotlin.idea.inspections.AbstractKotlinInspection
 import org.jetbrains.kotlin.idea.inspections.IntentionBasedInspection
-import org.jetbrains.kotlin.idea.util.application.runWriteAction
 import org.jetbrains.kotlin.psi.KtBlockExpression
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.psiUtil.containsInside
@@ -93,7 +94,9 @@ abstract class SelfTargetingIntention<TElement : PsiElement>(
         return !isIntentionBaseInspectionEnabled(project, target)
     }
 
-    var inspection: IntentionBasedInspection<TElement>? = null
+    fun hasApplicableTarget(editor: Editor, file: PsiFile) = getTarget(editor, file) != null
+
+    var inspection: AbstractKotlinInspection? = null
         internal set
 
     protected fun isIntentionBaseInspectionEnabled(project: Project, target: TElement): Boolean {
@@ -104,7 +107,14 @@ abstract class SelfTargetingIntention<TElement : PsiElement>(
             return false
         }
 
-        return inspection.intentionInfos.single { it.intention == this::class.java.kotlin }.additionalChecker(target, inspection)
+        return (inspection as? IntentionBasedInspection<TElement>)?.let {
+            it.intentionInfos.single { it.intention == this::class.java.kotlin }.additionalChecker(target, it)
+        } ?: run {
+            val holder = ProblemsHolder(InspectionManager.getInstance(project), target.containingFile, true)
+            val considerableParent = target.parentsWithSelf.firstOrNull { it::class in inspection.elementTypes }
+            considerableParent?.accept(inspection.buildVisitor(holder, true))
+            holder.hasResults()
+        }
     }
 
     final override fun invoke(project: Project, editor: Editor, file: PsiFile): Unit {
@@ -119,20 +129,18 @@ abstract class SelfTargetingIntention<TElement : PsiElement>(
     override fun toString(): String = getText()
 
     companion object {
-        private val intentionBasedInspections = HashMap<KClass<out SelfTargetingIntention<*>>, IntentionBasedInspection<*>?>()
+        private val intentionBasedInspections = HashMap<KClass<out SelfTargetingIntention<*>>, AbstractKotlinInspection?>()
 
-        fun <TElement : PsiElement> findInspection(intentionClass: KClass<out SelfTargetingIntention<TElement>>): IntentionBasedInspection<TElement>? {
+        fun <TElement : PsiElement> findInspection(intentionClass: KClass<out SelfTargetingIntention<TElement>>): AbstractKotlinInspection? {
             if (intentionBasedInspections.containsKey(intentionClass)) {
-                @Suppress("UNCHECKED_CAST")
-                return intentionBasedInspections[intentionClass] as IntentionBasedInspection<TElement>?
+                return intentionBasedInspections[intentionClass]
             }
 
             for (extension in Extensions.getExtensions(LocalInspectionEP.LOCAL_INSPECTION)) {
-                val inspection = extension.instance as? IntentionBasedInspection<*> ?: continue
-                if (inspection.intentionInfos.any { it.intention == intentionClass }) {
+                val inspection = extension.instance as? AbstractKotlinInspection ?: continue
+                if (inspection.boundIntentions.contains(intentionClass)) {
                     intentionBasedInspections[intentionClass] = inspection
-                    @Suppress("UNCHECKED_CAST")
-                    return inspection as IntentionBasedInspection<TElement>
+                    return inspection
                 }
             }
 

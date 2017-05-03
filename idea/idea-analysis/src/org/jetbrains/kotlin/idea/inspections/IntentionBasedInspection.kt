@@ -31,6 +31,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.PsiFile
 import com.intellij.util.SmartList
+import org.jetbrains.kotlin.idea.intentions.SelfTargetingIntention
 import org.jetbrains.kotlin.idea.intentions.SelfTargetingRangeIntention
 import org.jetbrains.kotlin.psi.psiUtil.endOffset
 import org.jetbrains.kotlin.psi.psiUtil.getStartOffsetIn
@@ -48,6 +49,9 @@ abstract class IntentionBasedInspection<TElement : PsiElement>(
         val intentionInfos: List<IntentionBasedInspection.IntentionData<TElement>>,
         protected open val problemText: String?
 ) : AbstractKotlinInspection() {
+
+    override val boundIntentions: List<KClass<out SelfTargetingIntention<*>>>
+        get() = intentionInfos.map { it.intention }
 
     constructor(
             intention: KClass<out SelfTargetingRangeIntention<TElement>>,

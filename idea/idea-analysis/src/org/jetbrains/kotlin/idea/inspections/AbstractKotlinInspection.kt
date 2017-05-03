@@ -23,8 +23,16 @@ import org.jetbrains.kotlin.asJava.unwrapped
 import org.jetbrains.kotlin.caches.resolve.KotlinCacheService
 import org.jetbrains.kotlin.diagnostics.Severity
 import org.jetbrains.kotlin.idea.highlighter.createSuppressWarningActions
+import org.jetbrains.kotlin.idea.intentions.SelfTargetingIntention
+import org.jetbrains.kotlin.psi.KtElement
+import kotlin.reflect.KClass
 
 abstract class AbstractKotlinInspection: LocalInspectionTool(), CustomSuppressableInspectionTool {
+
+    open val boundIntentions: List<KClass<out SelfTargetingIntention<*>>> get() = listOf()
+
+    open val elementTypes: List<KClass<out KtElement>> get() = listOf(KtElement::class)
+
     override fun getSuppressActions(element: PsiElement?): Array<SuppressIntentionAction>? {
         if (element == null) return emptyArray()
 

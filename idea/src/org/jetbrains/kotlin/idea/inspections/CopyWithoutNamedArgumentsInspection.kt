@@ -16,14 +16,16 @@
 
 package org.jetbrains.kotlin.idea.inspections
 
-import com.intellij.codeInspection.IntentionWrapper
 import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.psi.PsiElementVisitor
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.idea.intentions.AddNamesToCallArgumentsIntention
+import org.jetbrains.kotlin.idea.intentions.SelfTargetingIntention
+import org.jetbrains.kotlin.idea.intentions.SelfTargetingIntentionWrapper
 import org.jetbrains.kotlin.psi.KtCallExpression
+import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression
 import org.jetbrains.kotlin.psi.KtVisitorVoid
 import org.jetbrains.kotlin.psi.psiUtil.referenceExpression
@@ -31,8 +33,15 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DataClassDescriptorResolver
 import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
+import kotlin.reflect.KClass
 
 class CopyWithoutNamedArgumentsInspection : AbstractKotlinInspection() {
+
+    override val boundIntentions: List<KClass<out SelfTargetingIntention<*>>>
+        get() = listOf(AddNamesToCallArgumentsIntention::class)
+
+    override val elementTypes: List<KClass<out KtElement>>
+        get() = listOf(KtCallExpression::class)
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
         return object : KtVisitorVoid() {
@@ -54,7 +63,7 @@ class CopyWithoutNamedArgumentsInspection : AbstractKotlinInspection() {
                         expression.calleeExpression ?: return,
                         "'copy' method of data class is called without named arguments",
                         ProblemHighlightType.WEAK_WARNING,
-                        IntentionWrapper(AddNamesToCallArgumentsIntention(), expression.containingKtFile)
+                        SelfTargetingIntentionWrapper(AddNamesToCallArgumentsIntention(), expression.containingKtFile)
                 )
             }
         }
