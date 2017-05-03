@@ -16,17 +16,17 @@
 
 package org.jetbrains.kotlin.idea.inspections
 
+import com.intellij.codeInspection.IntentionWrapper
 import com.intellij.codeInspection.LocalInspectionToolSession
 import com.intellij.codeInspection.ProblemHighlightType.GENERIC_ERROR_OR_WARNING
 import com.intellij.codeInspection.ProblemHighlightType.WEAK_WARNING
 import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.psi.PsiElementVisitor
-import com.intellij.psi.search.searches.DefinitionsScopedSearch
 import org.jetbrains.kotlin.cfg.LeakingThisDescriptor.*
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.idea.caches.resolve.analyzeFully
+import org.jetbrains.kotlin.idea.quickfix.AddModifierFix
 import org.jetbrains.kotlin.lexer.KtTokens
-import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext.LEAKING_THIS
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
@@ -57,7 +57,7 @@ class LeakingThisInspection : AbstractKotlinInspection() {
                 val memberFix = memberDescriptorToFix?.let {
                     if (it.modality == Modality.OPEN) {
                         val modifierListOwner = DescriptorToSourceUtils.descriptorToDeclaration(it) as? KtDeclaration
-                        MakeFinalFix.create(modifierListOwner, it.name)
+                        modifierListOwner?.let { IntentionWrapper(AddModifierFix(it, KtTokens.FINAL_KEYWORD), it.containingFile) }
                     }
                     else null
                 }
@@ -65,7 +65,7 @@ class LeakingThisInspection : AbstractKotlinInspection() {
                 val klass = leakingThisDescriptor.classOrObject as? KtClass
                 val classFix =
                         if (klass != null && klass.hasModifier(KtTokens.OPEN_KEYWORD)) {
-                            MakeFinalFix.create(klass, klass.nameAsSafeName)
+                            IntentionWrapper(AddModifierFix(klass, KtTokens.FINAL_KEYWORD), klass.containingFile)
                         }
                         else null
 
@@ -77,19 +77,6 @@ class LeakingThisInspection : AbstractKotlinInspection() {
                         },
                         *(arrayOf(memberFix, classFix).filterNotNull().toTypedArray())
                 )
-            }
-        }
-    }
-
-    class MakeFinalFix private constructor(modifierListOwner: KtModifierListOwner, name: Name) :
-            AddModifierFix(modifierListOwner, KtTokens.FINAL_KEYWORD, "Make '$name' final") {
-
-        companion object {
-            fun create(declaration: KtDeclaration?, name: Name): MakeFinalFix? {
-                declaration ?: return null
-                val useScope = declaration.useScope
-                if (DefinitionsScopedSearch.search(declaration, useScope).findFirst() != null) return null
-                return MakeFinalFix(declaration, name)
             }
         }
     }
