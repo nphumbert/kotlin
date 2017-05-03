@@ -38,27 +38,27 @@ object JavaToKotlinClassMap : PlatformToKotlinClassMap {
     private val mutableToReadOnly = HashMap<FqNameUnsafe, FqName>()
     private val readOnlyToMutable = HashMap<FqNameUnsafe, FqName>()
 
-    // more broadly a class that has separate readOnly and mutable equivalents in Kotlin
-    data class PlatformCollection(
+    // describes mapping for a java class that has separate readOnly and mutable equivalents in Kotlin
+    data class PlatformMutabilityMapping(
             val javaClass: ClassId,
             val kotlinReadOnly: ClassId,
             val kotlinMutable: ClassId
     )
 
-    private inline fun <reified T> platformCollection(kotlinReadOnly: ClassId, kotlinMutable: FqName): PlatformCollection {
+    private inline fun <reified T> mutabilityMapping(kotlinReadOnly: ClassId, kotlinMutable: FqName): PlatformMutabilityMapping {
         val mutableClassId = ClassId(kotlinReadOnly.packageFqName, kotlinMutable.tail(kotlinReadOnly.packageFqName), false)
-        return PlatformCollection(classId(T::class.java), kotlinReadOnly, mutableClassId)
+        return PlatformMutabilityMapping(classId(T::class.java), kotlinReadOnly, mutableClassId)
     }
 
-    val platformCollections = listOf(
-            platformCollection<Iterable<*>>(ClassId.topLevel(FQ_NAMES.iterable), FQ_NAMES.mutableIterable),
-            platformCollection<Iterator<*>>(ClassId.topLevel(FQ_NAMES.iterator), FQ_NAMES.mutableIterator),
-            platformCollection<Collection<*>>(ClassId.topLevel(FQ_NAMES.collection), FQ_NAMES.mutableCollection),
-            platformCollection<List<*>>(ClassId.topLevel(FQ_NAMES.list), FQ_NAMES.mutableList),
-            platformCollection<Set<*>>(ClassId.topLevel(FQ_NAMES.set), FQ_NAMES.mutableSet),
-            platformCollection<ListIterator<*>>(ClassId.topLevel(FQ_NAMES.listIterator), FQ_NAMES.mutableListIterator),
-            platformCollection<Map<*, *>>(ClassId.topLevel(FQ_NAMES.map), FQ_NAMES.mutableMap),
-            platformCollection<Map.Entry<*, *>>(
+    val mutabilityMappings = listOf(
+            mutabilityMapping<Iterable<*>>(ClassId.topLevel(FQ_NAMES.iterable), FQ_NAMES.mutableIterable),
+            mutabilityMapping<Iterator<*>>(ClassId.topLevel(FQ_NAMES.iterator), FQ_NAMES.mutableIterator),
+            mutabilityMapping<Collection<*>>(ClassId.topLevel(FQ_NAMES.collection), FQ_NAMES.mutableCollection),
+            mutabilityMapping<List<*>>(ClassId.topLevel(FQ_NAMES.list), FQ_NAMES.mutableList),
+            mutabilityMapping<Set<*>>(ClassId.topLevel(FQ_NAMES.set), FQ_NAMES.mutableSet),
+            mutabilityMapping<ListIterator<*>>(ClassId.topLevel(FQ_NAMES.listIterator), FQ_NAMES.mutableListIterator),
+            mutabilityMapping<Map<*, *>>(ClassId.topLevel(FQ_NAMES.map), FQ_NAMES.mutableMap),
+            mutabilityMapping<Map.Entry<*, *>>(
                     ClassId.topLevel(FQ_NAMES.map).createNestedClassId(FQ_NAMES.mapEntry.shortName()), FQ_NAMES.mutableMapEntry
             )
     )
@@ -74,7 +74,7 @@ object JavaToKotlinClassMap : PlatformToKotlinClassMap {
         addTopLevel(Enum::class.java, FQ_NAMES._enum)
         addTopLevel(Annotation::class.java, FQ_NAMES.annotation)
 
-        for (platformCollection in platformCollections) {
+        for (platformCollection in mutabilityMappings) {
             addPlatformCollection(platformCollection)
         }
 
@@ -133,8 +133,8 @@ object JavaToKotlinClassMap : PlatformToKotlinClassMap {
         return kotlinToJava[kotlinFqName]
     }
 
-    private fun addPlatformCollection(platformCollection: PlatformCollection) {
-        val (javaClassId, readOnlyClassId, mutableClassId) = platformCollection
+    private fun addPlatformCollection(platformMutabilityMapping: PlatformMutabilityMapping) {
+        val (javaClassId, readOnlyClassId, mutableClassId) = platformMutabilityMapping
         add(javaClassId, readOnlyClassId)
         addKotlinToJava(mutableClassId.asSingleFqName(), javaClassId)
 
