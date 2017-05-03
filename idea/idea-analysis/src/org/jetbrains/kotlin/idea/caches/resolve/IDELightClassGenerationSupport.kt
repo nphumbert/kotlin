@@ -156,7 +156,7 @@ class IDELightClassGenerationSupport(private val project: Project) : LightClassG
     override fun getKotlinInternalClasses(fqName: FqName, scope: GlobalSearchScope): Collection<PsiClass> {
         if (fqName.isRoot) return emptyList()
 
-        return findPackageParts(fqName, scope) + findKotlinCollectionWrappers(fqName, scope)
+        return findPackageParts(fqName, scope) + findPlatformWrapper(fqName, scope)
     }
 
     private fun findPackageParts(fqName: FqName, scope: GlobalSearchScope): List<KtLightClassForDecompiledDeclaration> {
@@ -177,14 +177,8 @@ class IDELightClassGenerationSupport(private val project: Project) : LightClassG
         }
     }
 
-    private fun findKotlinCollectionWrappers(fqName: FqName, scope: GlobalSearchScope): Collection<PsiClass> {
-        if (fqName.asString() == "kotlin.collections.List") {
-            JavaPsiFacade.getInstance(project).findClass("java.util.List", scope)?.let {
-                return listOf(KtLightReadonlyListWrapper(it))
-            }
-        }
-
-        return emptyList()
+    private fun findPlatformWrapper(fqName: FqName, scope: GlobalSearchScope): Collection<PsiClass> {
+        return platformMutabilityWrapper(fqName) { JavaPsiFacade.getInstance(project).findClass(it, scope) }?.let { listOf(it) }.orEmpty()
     }
 
     fun createLightClassForFileFacade(

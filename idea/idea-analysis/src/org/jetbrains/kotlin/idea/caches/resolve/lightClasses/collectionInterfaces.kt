@@ -17,42 +17,100 @@
 package org.jetbrains.kotlin.idea.caches.resolve.lightClasses
 
 
-import com.intellij.openapi.util.Pair
 import com.intellij.psi.*
 import com.intellij.psi.impl.InheritanceImplUtil
 import com.intellij.psi.impl.PsiClassImplUtil
 import com.intellij.psi.impl.PsiSubstitutorImpl
+import com.intellij.psi.impl.PsiSubstitutorImpl.createSubstitutor
 import com.intellij.psi.impl.PsiSuperMethodImplUtil
 import com.intellij.psi.impl.light.*
 import com.intellij.psi.impl.source.ClassInnerStuffCache
 import com.intellij.psi.impl.source.PsiExtensibleClass
 import com.intellij.psi.impl.source.PsiImmediateClassType
+import com.intellij.psi.util.MethodSignature
+import com.intellij.psi.util.MethodSignatureBackedByPsiMethod
+import com.siyeh.ig.psiutils.TypeUtils
 import org.jetbrains.kotlin.asJava.classes.lazyPub
 import org.jetbrains.kotlin.builtins.DefaultBuiltIns
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.idea.KotlinLanguage
-import org.jetbrains.kotlin.idea.caches.resolve.getJavaClassDescriptor
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
+import org.jetbrains.kotlin.load.java.BuiltinMethodsWithSpecialGenericSignature
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.resolve.TargetPlatform
-import org.jetbrains.kotlin.resolve.descriptorUtil.module
+import org.jetbrains.kotlin.platform.JavaToKotlinClassMap
+import org.jetbrains.kotlin.platform.JavaToKotlinClassMap.PlatformMutabilityMapping
 
+private val readOnlyQualifiedNamesToJavaClass = JavaToKotlinClassMap.mutabilityMappings.associateBy {
+    (_, readOnly, _) ->
+    readOnly.asSingleFqName()
+}
 
-class KtLightReadonlyListWrapper(private val javaUtilList: PsiClass) : KtAbstractContainerWrapper("kotlin.List", javaUtilList), PsiClass {
+private val mutableQualifiedNamesToJavaClass = JavaToKotlinClassMap.mutabilityMappings.associateBy {
+    (_, _, mutable) ->
+    mutable.asSingleFqName()
+}
+
+private val erasedParameterMemberFqNames =
+        BuiltinMethodsWithSpecialGenericSignature.ERASED_VALUE_PARAMETERS_SIGNATURES.mapTo(LinkedHashSet()) {
+            val fqNameString = it.substringBefore('(').replace('/', '.')
+            FqName(fqNameString)
+        }
+
+fun platformMutabilityWrapper(fqName: FqName, findJavaClass: (String) -> PsiClass?): PsiClass? {
+    readOnlyQualifiedNamesToJavaClass.get(fqName)?.let {
+        mapping ->
+        val javaBaseClass = findJavaClass(mapping.javaClass.asSingleFqName().asString()) ?: return null
+        return KtLightReadOnlyPlatformReadOnlyClassWrapper(javaBaseClass, mapping)
+    }
+    mutableQualifiedNamesToJavaClass.get(fqName)?.let {
+        // return mutableWrapper
+    }
+    return null
+}
+
+class KtLightReadOnlyPlatformReadOnlyClassWrapper(
+        private val javaBaseClass: PsiClass,
+        private val mapping: PlatformMutabilityMapping
+) : KtAbstractContainerWrapper(mapping.kotlinReadOnly.asSingleFqName().asString(), javaBaseClass), PsiClass {
     private val _methods by lazyPub { calcMethods() }
 
-    override fun getOwnMethods(): List<PsiMethod> {
-        return _methods
+    override fun getOwnMethods() = _methods
+
+    private val substitutor = createSubstitutor(superClassTypeParametersToMyTypeParameters.mapValues {
+        PsiImmediateClassType(it.key, PsiSubstitutor.EMPTY)
+    })
+
+    private fun replaceType(psiType: PsiType, replaceObjectWithGeneric: Boolean): PsiType {
+        val substituted = substitutor.substitute(psiType)
+        if (!replaceObjectWithGeneric || !TypeUtils.isJavaLangObject(substituted)) return substituted
+
+        val typeParameter = typeParameters.first()
+        return PsiImmediateClassType(typeParameter, PsiSubstitutor.EMPTY)
     }
 
     private fun calcMethods(): List<PsiMethod> {
         val builtIns = DefaultBuiltIns.Instance
-        val list = builtIns.list
-        return javaUtilList.allMethods.mapNotNull {
-            if (!isInInterface(it, list) || it.name == "toArray") {
-                KtLightMethodWrapper(this, it)
+        val readOnlyClass = builtIns.getBuiltInClassByFqName(mapping.kotlinReadOnly.asSingleFqName())
+        return javaBaseClass.methods.flatMap {
+            val methodName = it.name
+            // TODO: this condition is error prone
+            if (mapping.javaClass.asSingleFqName().child(Name.identifier(methodName)) in erasedParameterMemberFqNames) {
+                val usual = KtLightMethodWrapper(this, it) {
+                    replaceType(it, replaceObjectWithGeneric = false)
+                }
+                val moreGeneric = KtLightMethodWrapper(this, it) {
+                    replaceType(it, replaceObjectWithGeneric = true)
+                }
+                return@flatMap listOf(usual, moreGeneric)
             }
-            else null
+            if (!isInInterface(it, readOnlyClass) || it.name == "toArray" || it.name == "size" || it.name == "indexOf") {
+                return@flatMap listOf(KtLightMethodWrapper(this, it) {
+                    replaceType(it, replaceObjectWithGeneric = false)
+                }
+                )
+            }
+            else return@flatMap emptyList<PsiMethod>()
         }
     }
 
@@ -63,36 +121,58 @@ class KtLightReadonlyListWrapper(private val javaUtilList: PsiClass) : KtAbstrac
     }
 }
 
-class KtLightMethodWrapper(private val containingClass: KtAbstractContainerWrapper, private val baseMethod: PsiMethod)
+class KtLightMethodWrapper(
+        private val containingClass: KtAbstractContainerWrapper,
+        private val baseMethod: PsiMethod,
+        private val transformType: (PsiType) -> PsiType = {it }
+) //TODO: drop LightMethod inheritance
     : LightMethod(containingClass, baseMethod, PsiSubstitutor.EMPTY /*TODO*/) {
     override fun hasModifierProperty(name: String) =
             when (name) {
                 PsiModifier.DEFAULT -> true
                 PsiModifier.ABSTRACT -> false
+                PsiModifier.FINAL -> true
                 else -> baseMethod.hasModifierProperty(name)
             }
 
     override fun getParameterList(): PsiParameterList {
         return LightParameterListBuilder(manager, KotlinLanguage.INSTANCE).apply {
-            val invertedMap: Map<PsiTypeParameter, PsiTypeParameter> = containingClass.typeParametersMap.entries.associateBy({ it.value }, { it.key })
-            val substitutor = PsiSubstitutorImpl.createSubstitutor(invertedMap.mapValues { PsiImmediateClassType(it.key, PsiSubstitutor.EMPTY) })
             baseMethod.parameterList.parameters.forEach { paramFromJava ->
-                addParameter(LightParameter(paramFromJava.name ?: "", substitutor.substitute(paramFromJava.type), this, KotlinLanguage.INSTANCE))
+                addParameter(LightParameter(paramFromJava.name ?: "it", transformType(paramFromJava.type), this, KotlinLanguage.INSTANCE))
             }
         }
     }
+
+    override fun findSuperMethods(checkAccess: Boolean) = PsiSuperMethodImplUtil.findSuperMethods(this, checkAccess)
+
+    override fun findSuperMethods(parentClass: PsiClass) = PsiSuperMethodImplUtil.findSuperMethods(this, parentClass)
+
+    override fun findSuperMethods() = PsiSuperMethodImplUtil.findSuperMethods(this)
+
+    override fun findSuperMethodSignaturesIncludingStatic(checkAccess: Boolean) = PsiSuperMethodImplUtil.findSuperMethodSignaturesIncludingStatic(this, checkAccess)
+
+    override fun findDeepestSuperMethod() = PsiSuperMethodImplUtil.findDeepestSuperMethod(this)
+
+    override fun findDeepestSuperMethods() = PsiSuperMethodImplUtil.findDeepestSuperMethods(this)
+
+    override fun getHierarchicalMethodSignature() = PsiSuperMethodImplUtil.getHierarchicalMethodSignature(this)
+
+    override fun getSignature(substitutor: PsiSubstitutor) = MethodSignatureBackedByPsiMethod.create(this, substitutor)
 }
 
 
 abstract class KtAbstractContainerWrapper(private val fqName: String, private val superInterface: PsiClass)
     : LightElement(superInterface.manager, KotlinLanguage.INSTANCE), PsiExtensibleClass {
 
-    val typeParametersMap: Map<PsiTypeParameter, PsiTypeParameter> = superInterface.typeParameters.withIndex().associateBy(
-            keySelector = { (index, supersParameter) ->
+    // TODO:
+    val superClassTypeParametersToMyTypeParameters: Map<PsiTypeParameter, PsiTypeParameter> = superInterface.typeParameters.withIndex().associateBy(
+            keySelector = { (_, supersParameter) -> supersParameter },
+            valueTransform = {
+                (index, supersParameter) ->
                 LightTypeParameterBuilder(supersParameter.name ?: "", this, index)
-            },
-            valueTransform = { (_, supersParameter) -> supersParameter }
+            }
     )
+
 
     override fun getSupers() = arrayOf(superInterface)
 
@@ -102,7 +182,7 @@ abstract class KtAbstractContainerWrapper(private val fqName: String, private va
 
     override fun getOwnFields() = emptyList<PsiField>()
 
-    override fun getAllMethodsAndTheirSubstitutors(): List<Pair<PsiMethod, PsiSubstitutor>> =
+    override fun getAllMethodsAndTheirSubstitutors() =
             PsiClassImplUtil.getAllWithSubstitutorsByMap<PsiMethod>(this, PsiClassImplUtil.MemberType.METHOD)
 
     private val memberCache = ClassInnerStuffCache(this)
@@ -128,7 +208,7 @@ abstract class KtAbstractContainerWrapper(private val fqName: String, private va
 
     override fun getTypeParameterList(): PsiTypeParameterList? {
         return LightTypeParameterListBuilder(manager, KotlinLanguage.INSTANCE).apply {
-            typeParametersMap.keys.forEach { addParameter(it) }
+            superClassTypeParametersToMyTypeParameters.values.forEach { addParameter(it) }
         } // TODO: lazyPub
     }
 
@@ -147,7 +227,8 @@ abstract class KtAbstractContainerWrapper(private val fqName: String, private va
 
     override fun getImplementsList() = _implementsList
 
-    override fun getSuperTypes() = arrayOf(PsiImmediateClassType(superInterface, PsiSubstitutorImpl.createSubstitutor(typeParametersMap.mapValues { PsiImmediateClassType(it.value, PsiSubstitutor.EMPTY) }))) // TODO:
+    // TODO: is this correct
+    override fun getSuperTypes() = arrayOf(PsiImmediateClassType(superInterface, createSubstitutor(superClassTypeParametersToMyTypeParameters.mapValues { PsiImmediateClassType(it.value, PsiSubstitutor.EMPTY) }))) // TODO:
 
     override fun getMethods() = memberCache.methods
 
@@ -163,7 +244,7 @@ abstract class KtAbstractContainerWrapper(private val fqName: String, private va
 
     override fun isInterface() = true
 
-    override fun getTypeParameters() = typeParametersMap.keys.toTypedArray()
+    override fun getTypeParameters() = superClassTypeParametersToMyTypeParameters.values.toTypedArray()
 
     override fun getInterfaces() = arrayOf(superInterface)
 
