@@ -17,13 +17,20 @@
 package org.jetbrains.kotlin.idea.intentions
 
 import com.intellij.openapi.editor.Editor
+import org.jetbrains.kotlin.descriptors.FunctionDescriptor
+import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
+import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 
 class InfixCallToOrdinaryIntention : SelfTargetingIntention<KtBinaryExpression>(KtBinaryExpression::class.java, "Replace infix call with ordinary call") {
     override fun isApplicableTo(element: KtBinaryExpression, caretOffset: Int): Boolean {
         if (element.operationToken != KtTokens.IDENTIFIER || element.left == null || element.right == null) return false
-        return element.operationReference.textRange.containsOffset(caretOffset)
+        if (!element.operationReference.textRange.containsOffset(caretOffset)) return false
+        val context = element.analyze(BodyResolveMode.PARTIAL)
+        val resolvedCall = element.getResolvedCall(context)
+        return (resolvedCall?.candidateDescriptor as? FunctionDescriptor)?.isInfix ?: true
     }
 
     override fun applyTo(element: KtBinaryExpression, editor: Editor?) {
