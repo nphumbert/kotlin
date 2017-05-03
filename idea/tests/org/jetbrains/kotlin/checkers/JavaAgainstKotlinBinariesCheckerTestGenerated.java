@@ -185,4 +185,19 @@ public class JavaAgainstKotlinBinariesCheckerTestGenerated extends AbstractJavaA
         String fileName = KotlinTestUtils.navigationMetadata("idea/testData/kotlinAndJavaChecker/javaAgainstKotlin/UsingKotlinPackageDeclarations.kt");
         doTest(fileName);
     }
+
+    @TestMetadata("idea/testData/kotlinAndJavaChecker/javaAgainstKotlin/stdCollections")
+    @TestDataPath("$PROJECT_ROOT")
+    @RunWith(JUnit3RunnerWithInners.class)
+    public static class StdCollections extends AbstractJavaAgainstKotlinBinariesCheckerTest {
+        public void testAllFilesPresentInStdCollections() throws Exception {
+            KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/kotlinAndJavaChecker/javaAgainstKotlin/stdCollections"), Pattern.compile("^(.+)\\.kt$"), TargetBackend.ANY, true);
+        }
+
+        @TestMetadata("UsingList.kt")
+        public void testUsingList() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("idea/testData/kotlinAndJavaChecker/javaAgainstKotlin/stdCollections/UsingList.kt");
+            doTest(fileName);
+        }
+    }
 }

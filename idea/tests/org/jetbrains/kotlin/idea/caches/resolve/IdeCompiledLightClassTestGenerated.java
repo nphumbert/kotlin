@@ -102,6 +102,12 @@ public class IdeCompiledLightClassTestGenerated extends AbstractIdeCompiledLight
         doTest(fileName);
     }
 
+    @TestMetadata("ImplementingMap.kt")
+    public void testImplementingMap() throws Exception {
+        String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/asJava/lightClasses/ImplementingMap.kt");
+        doTest(fileName);
+    }
+
     @TestMetadata("InheritingInterfaceDefaultImpls.kt")
     public void testInheritingInterfaceDefaultImpls() throws Exception {
         String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/asJava/lightClasses/InheritingInterfaceDefaultImpls.kt");
