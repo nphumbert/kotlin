@@ -16,6 +16,8 @@
 
 package org.jetbrains.kotlin.idea.intentions
 
+import com.intellij.codeHighlighting.HighlightDisplayLevel
+import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.editor.Editor
 import org.jetbrains.kotlin.builtins.getReturnTypeFromFunctionType
 import org.jetbrains.kotlin.builtins.isExtensionFunctionType
@@ -40,11 +42,8 @@ import org.jetbrains.kotlin.types.isError
 import org.jetbrains.kotlin.types.typeUtil.isTypeParameter
 import org.jetbrains.kotlin.types.typeUtil.isUnit
 
-class ConvertLambdaToReferenceInspection : IntentionBasedInspection<KtLambdaExpression>(
-        ConvertLambdaToReferenceIntention::class,
-        { it -> ConvertLambdaToReferenceIntention.shouldSuggestToConvert(it) }
-) {
-    override fun inspectionTarget(element: KtLambdaExpression) = element.bodyExpression?.statements?.singleOrNull()
+class ConvertLambdaToReferenceInspection : IntentionBasedInspection<KtLambdaExpression>(ConvertLambdaToReferenceIntention::class) {
+    //override fun getDefaultLevel(): HighlightDisplayLevel = HighlightDisplayLevel(HighlightSeverity.INFORMATION)
 }
 
 open class ConvertLambdaToReferenceIntention(text: String) :
@@ -219,10 +218,6 @@ open class ConvertLambdaToReferenceIntention(text: String) :
     }
 
     companion object {
-        internal fun shouldSuggestToConvert(element: KtLambdaExpression): Boolean {
-            val referenceName = buildReferenceText(lambdaExpression = element, shortTypes = true) ?: return false
-            return referenceName.length < element.text.length
-        }
 
         private fun buildReferenceText(lambdaExpression: KtLambdaExpression, shortTypes: Boolean): String? {
             val singleStatement = lambdaExpression.singleStatementOrNull()
