@@ -308,18 +308,17 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                 FqName kotlinInterfaceName = DescriptorUtils.getFqName(supertype.getConstructor().getDeclarationDescriptor()).toSafe();
                 String kotlinMarkerInterfaceInternalName = KOTLIN_MARKER_INTERFACES.get(kotlinInterfaceName);
 
-                if (kotlinMarkerInterfaceInternalName == null || typeMapper.getClassBuilderMode() != ClassBuilderMode.LIGHT_CLASSES) {
-                    sw.writeInterface();
-                    Type jvmInterfaceType = typeMapper.mapSupertype(supertype, sw);
-                    sw.writeInterfaceEnd();
-                    String jvmInterfaceInternalName = jvmInterfaceType.getInternalName();
+                sw.writeInterface();
+                Type jvmInterfaceType = typeMapper.mapSupertype(supertype, sw);
+                sw.writeInterfaceEnd();
+                String jvmInterfaceInternalName = jvmInterfaceType.getInternalName();
 
-                    superInterfaces.add(jvmInterfaceInternalName);
-                }
+                superInterfaces.add(jvmInterfaceInternalName);
 
 
                 if (kotlinMarkerInterfaceInternalName != null) {
                     if (typeMapper.getClassBuilderMode() == ClassBuilderMode.LIGHT_CLASSES) {
+                        // TODO: byFqNameWithoutInnerClasses is wrong for Map.Entry
                         kotlinMarkerInterfaces.add(JvmClassName.byFqNameWithoutInnerClasses(kotlinInterfaceName).getInternalName());
                     }
                     kotlinMarkerInterfaces.add(kotlinMarkerInterfaceInternalName);
