@@ -41,6 +41,7 @@ import org.jetbrains.kotlin.incremental.components.NoLookupLocation;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.load.java.JvmAbi;
 import org.jetbrains.kotlin.load.java.descriptors.JavaClassDescriptor;
+import org.jetbrains.kotlin.load.kotlin.TypeMappingMode;
 import org.jetbrains.kotlin.name.ClassId;
 import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.name.Name;
@@ -54,7 +55,6 @@ import org.jetbrains.kotlin.resolve.DescriptorUtils;
 import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilKt;
 import org.jetbrains.kotlin.resolve.calls.model.*;
 import org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilsKt;
-import org.jetbrains.kotlin.resolve.jvm.JvmClassName;
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmDeclarationOrigin;
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmDeclarationOriginKt;
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmClassSignature;
@@ -306,7 +306,6 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
         for (KotlinType supertype : descriptor.getTypeConstructor().getSupertypes()) {
             if (isJvmInterface(supertype.getConstructor().getDeclarationDescriptor())) {
                 FqName kotlinInterfaceName = DescriptorUtils.getFqName(supertype.getConstructor().getDeclarationDescriptor()).toSafe();
-                String kotlinMarkerInterfaceInternalName = KOTLIN_MARKER_INTERFACES.get(kotlinInterfaceName);
 
                 sw.writeInterface();
                 Type jvmInterfaceType = typeMapper.mapSupertype(supertype, sw);
@@ -315,12 +314,15 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
 
                 superInterfaces.add(jvmInterfaceInternalName);
 
-
+                String kotlinMarkerInterfaceInternalName = KOTLIN_MARKER_INTERFACES.get(kotlinInterfaceName);
                 if (kotlinMarkerInterfaceInternalName != null) {
                     if (typeMapper.getClassBuilderMode() == ClassBuilderMode.LIGHT_CLASSES) {
-                        // TODO: byFqNameWithoutInnerClasses is wrong for Map.Entry
-                        kotlinMarkerInterfaces.add(JvmClassName.byFqNameWithoutInnerClasses(kotlinInterfaceName).getInternalName());
+                        sw.writeInterface();
+                        Type kotlinCollectionType = typeMapper.mapType(supertype, sw, TypeMappingMode.SUPER_TYPE_KOTLIN_COLLECTIONS_AS_IS);
+                        sw.writeInterfaceEnd();
+                        superInterfaces.add(kotlinCollectionType.getInternalName());
                     }
+
                     kotlinMarkerInterfaces.add(kotlinMarkerInterfaceInternalName);
                 }
             }
