@@ -91,20 +91,27 @@ class KtLightReadOnlyPlatformReadOnlyClassWrapper(
         return javaBaseClass.methods.flatMap { method ->
             val methodName = method.name
 
-            javaGetterNameToKotlinGetterName.get(methodName)?.let {
-                val finalBridge = KtLightMethodWrapper(this, method)
-                val abstractKotlinGetter = KtLightMethodWrapper(this, method)
+            javaGetterNameToKotlinGetterName.get(methodName)?.let { kotlinName ->
+                if (kotlinName == methodName) return@flatMap listOf(KtLightMethodWrapper(this, method, shouldBeFinal = false))
+                val finalBridge = KtLightMethodWrapper(this, method, shouldBeFinal = true)
+                val abstractKotlinGetter = KtLightMethodWrapper(this, method, _name = kotlinName, shouldBeFinal = false)
                 return@flatMap listOf(finalBridge, abstractKotlinGetter)
             }
+            if (!isInInterface(method, readOnlyClass)) {
+                return@flatMap listOf(KtLightMethodWrapper(this, method, shouldBeFinal = true))
+            }
             if (methodName in membersWithSpecializedSignature) {
-                val finalBridgeWithObject = KtLightMethodWrapper(this, method, replaceObjectWithGeneric = false)
-                val abstractKotlinVariantWithGeneric = methodWithSpecialSignature(method) ?: KtLightMethodWrapper(this, method, replaceObjectWithGeneric = true)
+                if ((methodName == "get" || methodName == "remove") && javaBaseClass.qualifiedName != CommonClassNames.JAVA_UTIL_MAP) return@flatMap emptyList<PsiMethod>()
+
+                val finalBridgeWithObject = KtLightMethodWrapper(this, method, replaceObjectWithGeneric = false, shouldBeFinal = true)
+                val abstractKotlinVariantWithGeneric = methodWithSpecialSignature(method) ?: KtLightMethodWrapper(this, method, replaceObjectWithGeneric = true, shouldBeFinal = false)
                 return@flatMap listOf(finalBridgeWithObject, abstractKotlinVariantWithGeneric)
             }
 
-            if (!isInInterface(method, readOnlyClass)) {
-                return@flatMap listOf(KtLightMethodWrapper(this, method))
-            }
+            //TODO: figure out toArray
+//            if (methodName == "toArray") {
+//                return@flatMap listOf(KtLightMethodWrapper(this, method, shouldBeFinal = true))
+//            }
             return@flatMap emptyList<PsiMethod>()
         }
     }
@@ -147,7 +154,7 @@ class KtLightReadOnlyPlatformReadOnlyClassWrapper(
                 }
             else -> null
         } ?: return null
-        return KtLightMethodWrapper(this, method, providedSignature = signature)
+        return KtLightMethodWrapper(this, method, providedSignature = signature, shouldBeFinal = false)
     }
 
     private fun isInInterface(it: PsiMethod, list: ClassDescriptor) = Name.identifier(it.name).let {
@@ -163,6 +170,7 @@ private class KtLightMethodWrapper(
         private val containingClass: KtAbstractContainerWrapper,
         private val baseMethod: PsiMethod,
         private val _name: String = baseMethod.name,
+        private val shouldBeFinal: Boolean,
         private val replaceObjectWithGeneric: Boolean = false,
         private val providedSignature: MethodSignature? = null
 ) //TODO: drop LightMethod inheritance
@@ -182,9 +190,9 @@ private class KtLightMethodWrapper(
 
     override fun hasModifierProperty(name: String) =
             when (name) {
-                PsiModifier.DEFAULT -> true
-                PsiModifier.ABSTRACT -> false
-                PsiModifier.FINAL -> true
+                PsiModifier.DEFAULT -> shouldBeFinal
+                PsiModifier.ABSTRACT -> !shouldBeFinal
+                PsiModifier.FINAL -> shouldBeFinal
                 else -> baseMethod.hasModifierProperty(name)
             }
 
