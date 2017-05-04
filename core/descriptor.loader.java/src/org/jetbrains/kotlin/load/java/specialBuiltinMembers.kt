@@ -50,7 +50,7 @@ private fun String.method(name: String, parameters: String, returnType: String) 
                 SignatureBuildingComponents.signature(this@method, "$name($parameters)$returnType"))
 
 object BuiltinSpecialProperties {
-    private val PROPERTY_FQ_NAME_TO_JVM_GETTER_NAME_MAP = mapOf(
+    val PROPERTY_FQ_NAME_TO_JVM_GETTER_NAME_MAP = mapOf(
             BUILTIN_NAMES._enum.childSafe("name") to Name.identifier("name"),
             BUILTIN_NAMES._enum.childSafe("ordinal") to Name.identifier("ordinal"),
             BUILTIN_NAMES.collection.child("size") to Name.identifier("size"),
