@@ -98,6 +98,12 @@ public class JavaAgainstKotlinSourceCheckerTestGenerated extends AbstractJavaAga
             doTest(fileName);
         }
 
+        @TestMetadata("ExtendingReadOnlyInterfaces.kt")
+        public void testExtendingReadOnlyInterfaces() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("idea/testData/kotlinAndJavaChecker/javaAgainstKotlin/ExtendingReadOnlyInterfaces.kt");
+            doTest(fileName);
+        }
+
         @TestMetadata("FunctionInNestedClassInDataFlowInspection.kt")
         public void testFunctionInNestedClassInDataFlowInspection() throws Exception {
             String fileName = KotlinTestUtils.navigationMetadata("idea/testData/kotlinAndJavaChecker/javaAgainstKotlin/FunctionInNestedClassInDataFlowInspection.kt");
@@ -182,21 +188,9 @@ public class JavaAgainstKotlinSourceCheckerTestGenerated extends AbstractJavaAga
             doTest(fileName);
         }
 
-        @TestMetadata("UsingCollection.kt")
-        public void testUsingCollection() throws Exception {
-            String fileName = KotlinTestUtils.navigationMetadata("idea/testData/kotlinAndJavaChecker/javaAgainstKotlin/UsingCollection.kt");
-            doTest(fileName);
-        }
-
         @TestMetadata("UsingKotlinPackageDeclarations.kt")
         public void testUsingKotlinPackageDeclarations() throws Exception {
             String fileName = KotlinTestUtils.navigationMetadata("idea/testData/kotlinAndJavaChecker/javaAgainstKotlin/UsingKotlinPackageDeclarations.kt");
-            doTest(fileName);
-        }
-
-        @TestMetadata("UsingList.kt")
-        public void testUsingList() throws Exception {
-            String fileName = KotlinTestUtils.navigationMetadata("idea/testData/kotlinAndJavaChecker/javaAgainstKotlin/UsingList.kt");
             doTest(fileName);
         }
     }
