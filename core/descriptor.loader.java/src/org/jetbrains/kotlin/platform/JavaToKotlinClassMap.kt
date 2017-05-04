@@ -75,7 +75,7 @@ object JavaToKotlinClassMap : PlatformToKotlinClassMap {
         addTopLevel(Annotation::class.java, FQ_NAMES.annotation)
 
         for (platformCollection in mutabilityMappings) {
-            addPlatformCollection(platformCollection)
+            addMapping(platformCollection)
         }
 
         for (jvmType in JvmPrimitiveType.values()) {
@@ -133,7 +133,7 @@ object JavaToKotlinClassMap : PlatformToKotlinClassMap {
         return kotlinToJava[kotlinFqName]
     }
 
-    private fun addPlatformCollection(platformMutabilityMapping: PlatformMutabilityMapping) {
+    private fun addMapping(platformMutabilityMapping: PlatformMutabilityMapping) {
         val (javaClassId, readOnlyClassId, mutableClassId) = platformMutabilityMapping
         add(javaClassId, readOnlyClassId)
         addKotlinToJava(mutableClassId.asSingleFqName(), javaClassId)
