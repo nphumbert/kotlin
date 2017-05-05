@@ -1618,7 +1618,7 @@
                      displayName="If-Then foldable to '?:'"
                      groupName="Kotlin"
                      enabledByDefault="true"
-                     level="WEAK WARNING"
+                     level="INFO"
                      language="kotlin"
     />
 
@@ -1626,7 +1626,7 @@
                      displayName="If-Then foldable to '?.'"
                      groupName="Kotlin"
                      enabledByDefault="true"
-                     level="WEAK WARNING"
+                     level="INFO"
                      language="kotlin"
     />
 
