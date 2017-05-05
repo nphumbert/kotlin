@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
+ * Copyright 2010-2017 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,7 @@
 
 package org.jetbrains.kotlin.js.translate.expression;
 
-import org.jetbrains.kotlin.js.backend.ast.JsExpression;
-import org.jetbrains.kotlin.js.backend.ast.JsInvocation;
-import org.jetbrains.kotlin.js.backend.ast.JsNameRef;
-import org.jetbrains.kotlin.js.backend.ast.JsNumberLiteral;
+import org.jetbrains.kotlin.js.backend.ast.*;
 import com.intellij.util.SmartList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -88,7 +85,7 @@ public final class StringTemplateTranslator extends AbstractTranslator {
             KotlinType type = context().bindingContext().getType(entryExpression);
 
             if (translatedExpression instanceof JsNumberLiteral) {
-                append(context().program().getStringLiteral(translatedExpression.toString()));
+                append(new JsStringLiteral(translatedExpression.toString()));
                 return;
             }
 
@@ -131,7 +128,7 @@ public final class StringTemplateTranslator extends AbstractTranslator {
         }
 
         private void appendText(@NotNull String text) {
-            append(program().getStringLiteral(text));
+            append(new JsStringLiteral(text));
         }
 
         @NotNull

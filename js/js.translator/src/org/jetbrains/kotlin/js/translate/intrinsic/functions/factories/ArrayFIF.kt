@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 JetBrains s.r.o.
+ * Copyright 2010-2017 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,6 @@ import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.builtins.PrimitiveType
 import org.jetbrains.kotlin.builtins.PrimitiveType.*
 import org.jetbrains.kotlin.js.backend.ast.*
-import org.jetbrains.kotlin.js.backend.ast.metadata.SideEffectKind
-import org.jetbrains.kotlin.js.backend.ast.metadata.sideEffects
 import org.jetbrains.kotlin.js.config.JSConfigurationKeys
 import org.jetbrains.kotlin.js.patterns.NamePredicate
 import org.jetbrains.kotlin.js.patterns.PatternBuilder.pattern
@@ -108,9 +106,9 @@ object ArrayFIF : CompositeFIF() {
                 }
                 else {
                     val initValue = when (type) {
-                        BOOLEAN -> JsLiteral.FALSE
+                        BOOLEAN -> JsBooleanLiteral(false)
                         LONG -> JsNameRef(Namer.LONG_ZERO, Namer.kotlinLong())
-                        else -> JsNumberLiteral.ZERO
+                        else -> JsIntLiteral(0)
                     }
                     JsAstUtils.invokeKotlinFunction("newArray", size, initValue)
                 }
@@ -137,8 +135,7 @@ object ArrayFIF : CompositeFIF() {
                     JsAstUtils.invokeKotlinFunction("${type.lowerCaseName}ArrayIterator", receiver!!)
                 }
                 else {
-                    JsAstUtils.invokeKotlinFunction("arrayIterator", receiver!!,
-                                                    context.program().getStringLiteral(type.arrayTypeName.asString()))
+                    JsAstUtils.invokeKotlinFunction("arrayIterator", receiver!!, JsStringLiteral(type.arrayTypeName.asString()))
                 }
             })
         }
@@ -146,7 +143,7 @@ object ArrayFIF : CompositeFIF() {
         add(pattern(NamePredicate(arrayName), "<init>(Int,Function1)"), KotlinFunctionIntrinsic("newArrayF"))
         add(pattern(NamePredicate(arrayName), "iterator"), KotlinFunctionIntrinsic("arrayIterator"))
 
-        add(pattern(Namer.KOTLIN_LOWER_NAME, "arrayOfNulls"), KotlinFunctionIntrinsic("newArray", JsLiteral.NULL))
+        add(pattern(Namer.KOTLIN_LOWER_NAME, "arrayOfNulls"), KotlinFunctionIntrinsic("newArray", JsNullLiteral()))
 
         val arrayFactoryMethodNames = arrayTypeNames.map { Name.identifier(decapitalize(it.asString() + "Of")) }
         val arrayFactoryMethods = pattern(Namer.KOTLIN_LOWER_NAME, NamePredicate(arrayFactoryMethodNames))

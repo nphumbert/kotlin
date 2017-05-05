@@ -16,7 +16,7 @@
 package com.google.gwt.dev.js;
 
 import org.jetbrains.kotlin.js.backend.ast.*;
-import org.jetbrains.kotlin.js.backend.ast.JsLiteral.JsBooleanLiteral;
+import org.jetbrains.kotlin.js.backend.ast.JsBooleanLiteral;
 import org.jetbrains.kotlin.js.backend.ast.metadata.HasMetadata;
 import com.google.gwt.dev.js.parserExceptions.JsParserException;
 import com.google.gwt.dev.js.rhino.*;
@@ -29,12 +29,10 @@ import java.util.List;
 
 public class JsAstMapper {
 
-    private final JsProgram program;
     private final ScopeContext scopeContext;
 
     public JsAstMapper(@NotNull JsScope scope) {
         scopeContext = new ScopeContext(scope);
-        program = scope.getProgram();
     }
 
     private static JsParserException createParserException(String msg, Node offender) {
@@ -118,7 +116,7 @@ public class JsAstMapper {
                 return mapConditional(node);
 
             case TokenStream.STRING:
-                return program.getStringLiteral(node.getString());
+                return new JsStringLiteral(node.getString());
 
             case TokenStream.NUMBER_INT:
                 return mapIntNumber(node);
@@ -340,7 +338,7 @@ public class JsAstMapper {
 
         // Iterate over and map the arguments.
         //
-        List<JsExpression> arguments = new SmartList<JsExpression>();
+        List<JsExpression> arguments = new SmartList<>();
         from = from.getNext();
         while (from != null) {
             arguments.add(mapExpression(from));
@@ -688,12 +686,12 @@ public class JsAstMapper {
         return newExpr;
     }
 
-    private JsExpression mapIntNumber(Node numberNode) {
-        return program.getNumberLiteral((int) numberNode.getDouble());
+    private static JsExpression mapIntNumber(Node numberNode) {
+        return new JsIntLiteral((int) numberNode.getDouble());
     }
 
     private JsExpression mapDoubleNumber(Node numberNode) {
-        return program.getNumberLiteral(numberNode.getDouble());
+        return new JsDoubleLiteral(numberNode.getDouble());
     }
 
     private JsExpression mapObjectLit(Node objLitNode) throws JsParserException {
@@ -754,22 +752,22 @@ public class JsAstMapper {
         return new JsPrefixOperation(op, to);
     }
 
-    private JsExpression mapPrimary(Node node) throws JsParserException {
+    private static JsExpression mapPrimary(Node node) throws JsParserException {
         switch (node.getIntDatum()) {
             case TokenStream.THIS:
-                return JsLiteral.THIS;
+                return new JsThisRef();
 
             case TokenStream.TRUE:
-                return JsBooleanLiteral.TRUE;
+                return new JsBooleanLiteral(true);
 
             case TokenStream.FALSE:
-                return JsBooleanLiteral.FALSE;
+                return new JsBooleanLiteral(false);
 
             case TokenStream.NULL:
-                return JsNullLiteral.NULL;
+                return new JsNullLiteral();
 
             case TokenStream.UNDEFINED:
-                return JsLiteral.UNDEFINED;
+                return new JsNameRef("undefined");
 
             default:
                 throw createParserException("Unknown primary: " + node.getIntDatum(),
@@ -918,7 +916,7 @@ public class JsAstMapper {
 
     public List<JsStatement> mapStatements(Node nodeStmts)
             throws JsParserException {
-        List<JsStatement> stmts = new ArrayList<JsStatement>();
+        List<JsStatement> stmts = new ArrayList<>();
         mapStatements(stmts, nodeStmts);
         return stmts;
     }
