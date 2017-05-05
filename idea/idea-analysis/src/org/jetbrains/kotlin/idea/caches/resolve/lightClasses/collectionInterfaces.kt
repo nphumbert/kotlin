@@ -40,7 +40,6 @@ import org.jetbrains.kotlin.load.java.JvmAbi
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.platform.JavaToKotlinClassMap
-import org.jetbrains.kotlin.platform.JavaToKotlinClassMap.PlatformMutabilityMapping
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 
@@ -67,57 +66,68 @@ private val javaGetterNameToKotlinGetterName: Map<String, String> = BuiltinSpeci
 
 fun platformMutabilityWrapper(fqName: FqName, findJavaClass: (String) -> PsiClass?): PsiClass? {
     readOnlyQualifiedNamesToJavaClass.get(fqName)?.let {
-        mapping ->
-        val javaBaseClass = findJavaClass(mapping.javaClass.asSingleFqName().asString()) ?: return null
-        return KtLightReadOnlyPlatformReadOnlyClassWrapper(javaBaseClass, mapping)
+        (javaClass, kotlinReadOnly) ->
+        val javaBaseClass = findJavaClass(javaClass.asSingleFqName().asString()) ?: return null
+        return KtLightMutabilityPlatformWrapper(javaBaseClass, kotlinReadOnly.asSingleFqName(), isMutable = false)
     }
     mutableQualifiedNamesToJavaClass.get(fqName)?.let {
-        // return mutableWrapper
+        (javaClass, _, kotlinMutable) ->
+        val javaBaseClass = findJavaClass(javaClass.asSingleFqName().asString()) ?: return null
+        return KtLightMutabilityPlatformWrapper(javaBaseClass, kotlinMutable.asSingleFqName(), isMutable = true)
     }
     return null
 }
 
-class KtLightReadOnlyPlatformReadOnlyClassWrapper(
+class KtLightMutabilityPlatformWrapper(
         private val javaBaseClass: PsiClass,
-        private val mapping: PlatformMutabilityMapping
-) : KtAbstractContainerWrapper(mapping.kotlinReadOnly.asSingleFqName(), javaBaseClass), PsiClass {
-    private val _methods by lazyPub { calcMethods() }
+        private val kotlinInterfaceFqName: FqName,
+        private val isMutable: Boolean
+) : KtAbstractContainerWrapper(kotlinInterfaceFqName, javaBaseClass), PsiClass {
+    private val _methods by lazyPub { javaBaseClass.methods.flatMap { methodWrappers(it) } }
 
     override fun getOwnMethods() = _methods
 
-    private fun calcMethods(): List<PsiMethod> {
-        val builtIns = DefaultBuiltIns.Instance
-        val readOnlyClass = builtIns.getBuiltInClassByFqName(mapping.kotlinReadOnly.asSingleFqName())
-        return javaBaseClass.methods.flatMap { method ->
-            val methodName = method.name
-
-            javaGetterNameToKotlinGetterName.get(methodName)?.let { kotlinName ->
-                if (kotlinName == methodName) return@flatMap listOf(KtLightMethodWrapper(this, method, shouldBeFinal = false))
-                val finalBridge = KtLightMethodWrapper(this, method, shouldBeFinal = true)
-                val abstractKotlinGetter = KtLightMethodWrapper(this, method, _name = kotlinName, shouldBeFinal = false)
-                return@flatMap listOf(finalBridge, abstractKotlinGetter)
+    private fun methodWrappers(method: PsiMethod): List<PsiMethod> {
+        val methodName = method.name
+        if (javaBaseClass.qualifiedName == CommonClassNames.JAVA_UTIL_MAP_ENTRY) {
+            if (!isMutable && methodName == "setValue") {
+                return listOf(method.wrap(makeFinal = true))
             }
-            if (!isInInterface(method, readOnlyClass)) {
-                return@flatMap listOf(KtLightMethodWrapper(this, method, shouldBeFinal = true))
+            else {
+                return emptyList()
             }
-            if (methodName in membersWithSpecializedSignature) {
-                if ((methodName == "get" || methodName == "remove") && javaBaseClass.qualifiedName != CommonClassNames.JAVA_UTIL_MAP) return@flatMap emptyList<PsiMethod>()
-
-                val finalBridgeWithObject = KtLightMethodWrapper(this, method, replaceObjectWithGeneric = false, shouldBeFinal = true)
-                val abstractKotlinVariantWithGeneric = methodWithSpecialSignature(method) ?: KtLightMethodWrapper(this, method, replaceObjectWithGeneric = true, shouldBeFinal = false)
-                return@flatMap listOf(finalBridgeWithObject, abstractKotlinVariantWithGeneric)
-            }
-
-            //TODO: figure out toArray
-//            if (methodName == "toArray") {
-//                return@flatMap listOf(KtLightMethodWrapper(this, method, shouldBeFinal = true))
-//            }
-            return@flatMap emptyList<PsiMethod>()
         }
+        javaGetterNameToKotlinGetterName.get(methodName)?.let { kotlinName ->
+            val finalBridge = method.wrap(makeFinal = true)
+            val abstractKotlinGetter = method.wrap(name = kotlinName, makeFinal = false)
+            return listOf(finalBridge, abstractKotlinGetter)
+        }
+        val kotlinInterface = DefaultBuiltIns.Instance.getBuiltInClassByFqName(kotlinInterfaceFqName)
+        if (!isInInterface(method, kotlinInterface)) {
+            return listOf(method.wrap(makeFinal = true))
+        }
+        if (methodName in membersWithSpecializedSignature) {
+            when (methodName) {
+                "get", "remove" -> when {
+                    javaBaseClass.qualifiedName == CommonClassNames.JAVA_UTIL_MAP -> {
+                        return listOf(methodWithSpecialSignature(method)).filterNotNull()
+                    }
+                    else -> return emptyList<PsiMethod>()
+                }
+                else -> {
+                    val finalBridgeWithObject = KtLightMethodWrapper(this, method, replaceObjectWithGeneric = false, shouldBeFinal = true)
+                    val abstractKotlinVariantWithGeneric = methodWithSpecialSignature(method) ?: KtLightMethodWrapper(this, method, replaceObjectWithGeneric = true, shouldBeFinal = false)
+                    return listOf(finalBridgeWithObject, abstractKotlinVariantWithGeneric)
+                }
+            }
+        }
+
+        return emptyList<PsiMethod>()
     }
 
+    private fun PsiMethod.wrap(makeFinal: Boolean, name: String = this.name) = KtLightMethodWrapper(this@KtLightMutabilityPlatformWrapper, this, shouldBeFinal = makeFinal, _name = name)
+
     private fun methodWithSpecialSignature(method: PsiMethod): KtLightMethodWrapper? {
-//        return null
         if (javaBaseClass.qualifiedName != CommonClassNames.JAVA_UTIL_MAP) return null
 
         val k = typeParameters[0].asType()
@@ -146,7 +156,7 @@ class KtLightReadOnlyPlatformReadOnlyClassWrapper(
                             parameterTypes = listOf(k),
                             returnType = v
                     )
-                    2 ->MethodSignature(
+                    2 -> MethodSignature(
                             parameterTypes = listOf(k, v),
                             returnType = PsiType.BOOLEAN
                     )
@@ -176,13 +186,10 @@ private class KtLightMethodWrapper(
 ) //TODO: drop LightMethod inheritance
     : LightMethod(containingClass, baseMethod, PsiSubstitutor.EMPTY /*TODO*/) {
 
-    private fun substituteType(psiType: PsiType, isParameter: Boolean = true): PsiType {
+    private fun substituteType(psiType: PsiType): PsiType {
         val substituted = containingClass._substitutor.substitute(psiType)
         if (!replaceObjectWithGeneric || !TypeUtils.isJavaLangObject(substituted)) return substituted
 
-//        val correspondingClass = DefaultBuiltIns.Instance.getBuiltInClassByFqName(containingClass.fqName)
-//        val correspondingFunction = correspondingClass.unsubstitutedMemberScope.getContributedFunctions(Name.identifier(_name), NoLookupLocation.FROM_IDE)
-//        correspondingFunction.
         val typeParameter = containingClass.typeParameters.singleOrNull() ?: return psiType
         return PsiImmediateClassType(typeParameter, PsiSubstitutor.EMPTY)
     }
