@@ -83,9 +83,13 @@ class KtLightMutabilityPlatformWrapper(
         private val kotlinInterfaceFqName: FqName,
         private val isMutable: Boolean
 ) : KtAbstractContainerWrapper(kotlinInterfaceFqName, javaBaseClass), PsiClass {
-    private val _methods by lazyPub { javaBaseClass.methods.flatMap { methodWrappers(it) } + additionalMethods()}
+    private val _methods by lazyPub { calcMethods() }
 
-    override fun getOwnMethods() = _methods
+    private fun calcMethods() = javaBaseClass.methods.flatMap { methodWrappers(it) } + additionalMethods()
+
+    override fun getOwnMethods(): List<PsiMethod> {
+        return _methods
+    }
 
     private fun methodWrappers(method: PsiMethod): List<PsiMethod> {
         val methodName = method.name
@@ -106,25 +110,28 @@ class KtLightMutabilityPlatformWrapper(
         if (!isInInterface(method, kotlinInterface)) {
             return listOf(method.wrap(makeFinal = true))
         }
-        if (methodName in membersWithSpecializedSignature) {
-            when (methodName) {
-                "get", "remove" -> when (javaBaseClass.qualifiedName) {
-                    CommonClassNames.JAVA_UTIL_MAP -> {
-                        return listOf(methodWithSpecialSignature(method)).filterNotNull()
-                    }
-                    else -> return emptyList<PsiMethod>()
-                }
-                else -> {
-                    val finalBridgeWithObject = method.wrap(makeFinal = true)
-                    val abstractKotlinVariantWithGeneric =
-                            methodWithSpecialSignature(method)
-                            ?: method.wrap(substituteObjectWith = singleTypeParameterAsType(), makeFinal = false)
-                    return listOf(finalBridgeWithObject, abstractKotlinVariantWithGeneric)
-                }
-            }
+
+        return methodsWithSpecializedSignature(method)
+    }
+
+    private fun methodsWithSpecializedSignature(method: PsiMethod): List<PsiMethod> {
+        val methodName = method.name
+
+        if (methodName !in membersWithSpecializedSignature) return emptyList()
+
+        if (javaBaseClass.qualifiedName == CommonClassNames.JAVA_UTIL_MAP) {
+            val abstractKotlinVariantWithGeneric = javaUtilMapMethodWithSpecialSignature(method) ?: return emptyList()
+            val finalBridgeWithObject = method.wrap(makeFinal = true)
+            return listOf(finalBridgeWithObject, abstractKotlinVariantWithGeneric)
         }
 
-        return emptyList<PsiMethod>()
+        if (methodName == "remove" && method.parameterList.parameters.singleOrNull()?.type == PsiPrimitiveType.INT) {
+            return listOf(method.wrap(makeFinal = true))
+        }
+
+        val finalBridgeWithObject = method.wrap(makeFinal = true)
+        val abstractKotlinVariantWithGeneric = method.wrap(substituteObjectWith = singleTypeParameterAsType(), makeFinal = false)
+        return listOf(finalBridgeWithObject, abstractKotlinVariantWithGeneric)
     }
 
     private fun singleTypeParameterAsType() = typeParameters.single().asType()
@@ -159,7 +166,7 @@ class KtLightMutabilityPlatformWrapper(
             providedSignature = signature
     )
 
-    private fun methodWithSpecialSignature(method: PsiMethod): KtLightMethodWrapper? {
+    private fun javaUtilMapMethodWithSpecialSignature(method: PsiMethod): KtLightMethodWrapper? {
         if (javaBaseClass.qualifiedName != CommonClassNames.JAVA_UTIL_MAP) return null
 
         val k = typeParameters[0].asType()
