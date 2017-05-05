@@ -1,4 +1,4 @@
-public class EtendingReadOnlyCollections {
+public class EtendingReadOnlyInterfaces {
     public static class Lists {
         <error>public static class ExtendIList1 implements IList<String></error> {
 
