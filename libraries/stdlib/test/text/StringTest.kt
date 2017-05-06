@@ -896,7 +896,7 @@ class StringTest {
 
         val result3 = data.windowed(size, 1)
         result3.forEachIndexed { index, window ->
-            assertEquals(size - index, window.length)
+            assertEquals(size - index, window.length, "size of window#$index")
         }
 
         assertTrue(arg1("").windowed(3, 2).isEmpty())

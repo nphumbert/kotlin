@@ -184,7 +184,7 @@ abstract class OrderedIterableTests<T : Iterable<String>>(createFrom: (Array<out
 
         val result3 = data.windowed(size, 1)
         result3.forEachIndexed { index, window ->
-            assertEquals(size - index, window.size)
+            assertEquals(size - index, window.size, "size of window#$index")
         }
 
         assertTrue(empty.windowed(3, 2).isEmpty())
