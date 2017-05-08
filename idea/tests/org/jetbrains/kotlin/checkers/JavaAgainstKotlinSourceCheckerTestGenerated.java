@@ -200,6 +200,12 @@ public class JavaAgainstKotlinSourceCheckerTestGenerated extends AbstractJavaAga
             doTest(fileName);
         }
 
+        @TestMetadata("UsingMutableInterfaces.kt")
+        public void testUsingMutableInterfaces() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("idea/testData/kotlinAndJavaChecker/javaAgainstKotlin/UsingMutableInterfaces.kt");
+            doTest(fileName);
+        }
+
         @TestMetadata("UsingReadOnlyInterfaces.kt")
         public void testUsingReadOnlyInterfaces() throws Exception {
             String fileName = KotlinTestUtils.navigationMetadata("idea/testData/kotlinAndJavaChecker/javaAgainstKotlin/UsingReadOnlyInterfaces.kt");

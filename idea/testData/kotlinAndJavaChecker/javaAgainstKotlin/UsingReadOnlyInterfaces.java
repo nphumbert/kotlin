@@ -7,6 +7,7 @@ public class UsingReadOnlyInterfaces {
             iCollection.isEmpty();
             iCollection.clear();
             iCollection.<error>getSize</error>();
+            iCollection.size();
         }
 
         public static <E> void useCCollection(CCollection<E> cCollection, E elem, java.util.Collection<E> other) {
@@ -16,8 +17,21 @@ public class UsingReadOnlyInterfaces {
             cCollection.isEmpty();
             cCollection.clear();
             cCollection.getSize();
+            cCollection.size();
             cCollection.contains(elem);
             cCollection.contains("sasd");
+        }
+    }
+
+    public static class Maps {
+        public static <E, V> void useCMap(CMap<E, V> cMap) {
+            cMap.isEmpty();
+            java.util.Set<E> s = cMap.getKeys();
+            s = cMap.keySet();
+            java.util.Collection<V> v = cMap.getValues();
+            v = cMap.values();
+            java.util.Set<java.util.Map.Entry<E, V>> e = cMap.entrySet();
+            e = cMap.getEntries();
         }
     }
 }
