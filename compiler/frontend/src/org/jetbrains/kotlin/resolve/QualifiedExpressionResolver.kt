@@ -276,8 +276,10 @@ class QualifiedExpressionResolver {
                 return true
             }
             if (doubleColonLHS && expression is KtCallExpression && expression.isWithoutValueArguments) {
-                val simpleName = expression.calleeExpression as KtSimpleNameExpression
-                result.add(QualifierPart(simpleName.getReferencedNameAsName(), simpleName, expression.typeArgumentList))
+                val simpleName = expression.calleeExpression
+                if (simpleName is KtSimpleNameExpression) {
+                    result.add(QualifierPart(simpleName.getReferencedNameAsName(), simpleName, expression.typeArgumentList))
+                }
                 return true
             }
             return false
