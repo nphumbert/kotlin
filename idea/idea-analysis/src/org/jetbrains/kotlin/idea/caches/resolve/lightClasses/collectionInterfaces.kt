@@ -17,6 +17,7 @@
 package org.jetbrains.kotlin.idea.caches.resolve.lightClasses
 
 
+import com.intellij.openapi.util.Key
 import com.intellij.psi.*
 import com.intellij.psi.impl.InheritanceImplUtil
 import com.intellij.psi.impl.PsiClassImplUtil
@@ -31,7 +32,6 @@ import com.intellij.psi.util.MethodSignatureBackedByPsiMethod
 import com.siyeh.ig.psiutils.TypeUtils
 import org.jetbrains.kotlin.asJava.classes.lazyPub
 import org.jetbrains.kotlin.builtins.DefaultBuiltIns
-import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.idea.KotlinLanguage
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.load.java.BuiltinMethodsWithSpecialGenericSignature
@@ -40,6 +40,7 @@ import org.jetbrains.kotlin.load.java.JvmAbi
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.platform.JavaToKotlinClassMap
+import org.jetbrains.kotlin.psi.UserDataProperty
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 
@@ -68,15 +69,28 @@ fun platformMutabilityWrapper(fqName: FqName, findJavaClass: (String) -> PsiClas
     readOnlyQualifiedNamesToJavaClass.get(fqName)?.let {
         (javaClass, kotlinReadOnly) ->
         val javaBaseClass = findJavaClass(javaClass.asSingleFqName().asString()) ?: return null
-        return KtLightMutabilityPlatformWrapper(javaBaseClass, kotlinReadOnly.asSingleFqName(), isMutable = false)
+        val readOnlyWrapper = javaBaseClass.readOnlyWrapper ?: KtLightMutabilityPlatformWrapper(javaBaseClass, kotlinReadOnly.asSingleFqName(), isMutable = false)
+                .apply {
+                    javaBaseClass.readOnlyWrapper = this
+                }
+
+        return readOnlyWrapper
     }
     mutableQualifiedNamesToJavaClass.get(fqName)?.let {
         (javaClass, _, kotlinMutable) ->
         val javaBaseClass = findJavaClass(javaClass.asSingleFqName().asString()) ?: return null
-        return KtLightMutabilityPlatformWrapper(javaBaseClass, kotlinMutable.asSingleFqName(), isMutable = true)
+        val mutableWrapper = javaBaseClass.mutableWrapper ?: KtLightMutabilityPlatformWrapper(javaBaseClass, kotlinMutable.asSingleFqName(), isMutable = true)
+                .apply {
+                    javaBaseClass.mutableWrapper = this
+                }
+
+        return mutableWrapper
     }
     return null
 }
+
+private var PsiClass.readOnlyWrapper: KtLightMutabilityPlatformWrapper? by UserDataProperty(Key.create("READ_ONLY_WRAPPER"))
+private var PsiClass.mutableWrapper: KtLightMutabilityPlatformWrapper? by UserDataProperty(Key.create("MUTABLE_WRAPPER"))
 
 class KtLightMutabilityPlatformWrapper(
         private val javaBaseClass: PsiClass,
@@ -95,20 +109,19 @@ class KtLightMutabilityPlatformWrapper(
         val methodName = method.name
         if (javaBaseClass.qualifiedName == CommonClassNames.JAVA_UTIL_MAP_ENTRY) {
             if (!isMutable && methodName == "setValue") {
-                return listOf(method.wrap(makeFinal = true))
+                return listOf(method.finalBridge())
             }
             else {
                 return emptyList()
             }
         }
         javaGetterNameToKotlinGetterName.get(methodName)?.let { kotlinName ->
-            val finalBridgeForJava = method.wrap(makeFinal = true)
-            val abstractKotlinGetter = method.wrap(name = kotlinName, makeFinal = false)
+            val finalBridgeForJava = method.finalBridge()
+            val abstractKotlinGetter = method.wrap(name = kotlinName)
             return listOf(finalBridgeForJava, abstractKotlinGetter)
         }
-        val kotlinInterface = DefaultBuiltIns.Instance.getBuiltInClassByFqName(kotlinInterfaceFqName)
-        if (!isInInterface(method, kotlinInterface)) {
-            return listOf(method.wrap(makeFinal = true))
+        if (!inKotlinInterface(method)) {
+            return listOf(method.finalBridge())
         }
 
         return methodsWithSpecializedSignature(method)
@@ -121,16 +134,16 @@ class KtLightMutabilityPlatformWrapper(
 
         if (javaBaseClass.qualifiedName == CommonClassNames.JAVA_UTIL_MAP) {
             val abstractKotlinVariantWithGeneric = javaUtilMapMethodWithSpecialSignature(method) ?: return emptyList()
-            val finalBridgeWithObject = method.wrap(makeFinal = true)
+            val finalBridgeWithObject = method.finalBridge()
             return listOf(finalBridgeWithObject, abstractKotlinVariantWithGeneric)
         }
 
         if (methodName == "remove" && method.parameterList.parameters.singleOrNull()?.type == PsiPrimitiveType.INT) {
-            return listOf(method.wrap(makeFinal = true))
+            return listOf(method.finalBridge())
         }
 
-        val finalBridgeWithObject = method.wrap(makeFinal = true)
-        val abstractKotlinVariantWithGeneric = method.wrap(substituteObjectWith = singleTypeParameterAsType(), makeFinal = false)
+        val finalBridgeWithObject = method.finalBridge()
+        val abstractKotlinVariantWithGeneric = method.wrap(substituteObjectWith = singleTypeParameterAsType())
         return listOf(finalBridgeWithObject, abstractKotlinVariantWithGeneric)
     }
 
@@ -139,7 +152,6 @@ class KtLightMutabilityPlatformWrapper(
     private fun additionalMethods(): List<PsiMethod> {
         if (javaBaseClass.qualifiedName == CommonClassNames.JAVA_UTIL_LIST && isMutable) {
             val removeAtMethod = javaBaseClass.findMethodsByName("remove", false).firstOrNull()?.wrap(
-                    makeFinal = false,
                     name = "removeAt",
                     signature = MethodSignature(
                             parameterTypes = listOf(PsiType.INT),
@@ -153,8 +165,10 @@ class KtLightMutabilityPlatformWrapper(
         return emptyList()
     }
 
+    private fun PsiMethod.finalBridge() = wrap(makeFinal = true)
+
     private fun PsiMethod.wrap(
-            makeFinal: Boolean,
+            makeFinal: Boolean = false,
             name: String = this.name,
             substituteObjectWith: PsiType? = null,
             signature: MethodSignature? = null
@@ -204,11 +218,12 @@ class KtLightMutabilityPlatformWrapper(
             else -> null
         } ?: return null
 
-        return method.wrap(signature = signature, makeFinal = false)
+        return method.wrap(signature = signature)
     }
 
-    private fun isInInterface(it: PsiMethod, list: ClassDescriptor) = Name.identifier(it.name).let {
-        val scope = list.unsubstitutedMemberScope
+    private fun inKotlinInterface(it: PsiMethod) = Name.identifier(it.name).let {
+        val kotlinInterface = DefaultBuiltIns.Instance.getBuiltInClassByFqName(kotlinInterfaceFqName)
+        val scope = kotlinInterface.unsubstitutedMemberScope
         scope.getContributedFunctions(it, NoLookupLocation.FROM_IDE).isNotEmpty()
         || scope.getContributedVariables(it, NoLookupLocation.FROM_IDE).isNotEmpty()
     }
