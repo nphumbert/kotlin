@@ -2,7 +2,7 @@
 package test
 
 @Suppress("NOT_YET_SUPPORTED_IN_INLINE")
-inline fun inlineFun(capturedParam: String, lambda: () -> Any = { capturedParam as Any }): Any {
+inline fun inlineFun(lambda: () -> Any = { "OK" as Any }): Any {
     return lambda()
 }
 
@@ -11,5 +11,5 @@ inline fun inlineFun(capturedParam: String, lambda: () -> Any = { capturedParam 
 import test.*
 
 fun box(): String {
-    return inlineFun("OK") as String
+    return inlineFun() as String
 }

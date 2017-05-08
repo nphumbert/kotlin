@@ -955,9 +955,15 @@ public class CompileKotlinAgainstInlineKotlinTestGenerated extends AbstractCompi
                 doTest(fileName);
             }
 
-            @TestMetadata("simpleNonGeneric.kt")
-            public void testSimpleNonGeneric() throws Exception {
-                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/boxInline/defaultValues/lambdaInlining/simpleNonGeneric.kt");
+            @TestMetadata("simpleErasedStaticInstance.kt")
+            public void testSimpleErasedStaticInstance() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/boxInline/defaultValues/lambdaInlining/simpleErasedStaticInstance.kt");
+                doTest(fileName);
+            }
+
+            @TestMetadata("simpleStaticInstance.kt")
+            public void testSimpleStaticInstance() throws Exception {
+                String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/boxInline/defaultValues/lambdaInlining/simpleStaticInstance.kt");
                 doTest(fileName);
             }
         }
