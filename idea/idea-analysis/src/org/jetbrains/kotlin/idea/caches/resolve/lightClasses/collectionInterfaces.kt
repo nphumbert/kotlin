@@ -31,6 +31,7 @@ import com.intellij.psi.impl.source.PsiImmediateClassType
 import com.intellij.psi.util.MethodSignatureBackedByPsiMethod
 import com.siyeh.ig.psiutils.TypeUtils
 import org.jetbrains.kotlin.asJava.classes.lazyPub
+import org.jetbrains.kotlin.asJava.elements.KtLightElementBase
 import org.jetbrains.kotlin.builtins.DefaultBuiltIns
 import org.jetbrains.kotlin.idea.KotlinLanguage
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
@@ -238,8 +239,7 @@ private class KtLightMethodWrapper(
         private val shouldBeFinal: Boolean,
         private val substituteObjectWith: PsiType?,
         private val providedSignature: MethodSignature?
-) //TODO: drop LightMethod inheritance
-    : LightMethod(containingClass, baseMethod, PsiSubstitutor.EMPTY /*TODO*/) {
+) : PsiMethod, KtLightElementBase(containingClass) {
 
     private fun substituteType(psiType: PsiType): PsiType {
         val substituted = containingClass._substitutor.substitute(psiType)
@@ -251,6 +251,7 @@ private class KtLightMethodWrapper(
         }
     }
 
+    override val kotlinOrigin get() = null
 
     override fun hasModifierProperty(name: String) =
             when (name) {
@@ -270,24 +271,32 @@ private class KtLightMethodWrapper(
     }
 
     override fun getName() = _name
-
     override fun getReturnType() = providedSignature?.returnType ?: baseMethod.returnType?.let { substituteType(it) }
 
+    override fun getTypeParameters() = PsiTypeParameter.EMPTY_ARRAY
+    override fun getTypeParameterList() = null
+
     override fun findSuperMethods(checkAccess: Boolean) = PsiSuperMethodImplUtil.findSuperMethods(this, checkAccess)
-
     override fun findSuperMethods(parentClass: PsiClass) = PsiSuperMethodImplUtil.findSuperMethods(this, parentClass)
-
     override fun findSuperMethods() = PsiSuperMethodImplUtil.findSuperMethods(this)
-
     override fun findSuperMethodSignaturesIncludingStatic(checkAccess: Boolean) = PsiSuperMethodImplUtil.findSuperMethodSignaturesIncludingStatic(this, checkAccess)
-
     override fun findDeepestSuperMethod() = PsiSuperMethodImplUtil.findDeepestSuperMethod(this)
-
     override fun findDeepestSuperMethods() = PsiSuperMethodImplUtil.findDeepestSuperMethods(this)
-
     override fun getHierarchicalMethodSignature() = PsiSuperMethodImplUtil.getHierarchicalMethodSignature(this)
-
     override fun getSignature(substitutor: PsiSubstitutor) = MethodSignatureBackedByPsiMethod.create(this, substitutor)
+    override fun getReturnTypeElement(): PsiTypeElement?  = null
+    override fun getContainingClass() = containingClass
+    override fun getThrowsList() = baseMethod.throwsList
+    override fun hasTypeParameters() = baseMethod.hasTypeParameters()
+    override fun isVarArgs() = baseMethod.isVarArgs
+    override fun isConstructor() = false
+    private val identifier by lazyPub { LightIdentifier(manager, name) }
+    override fun getNameIdentifier() = identifier
+    override fun getDocComment() = baseMethod.docComment
+    override fun getModifierList() = baseMethod.modifierList
+    override fun getBody() = null
+    override fun isDeprecated() = baseMethod.isDeprecated
+    override fun setName(name: String) = error("Cannot modify")
 }
 
 
