@@ -468,9 +468,9 @@ class CompilerDaemonTest : KotlinIntegrationTestBase() {
         }
     }
 
-    fun testParallelDaemonStart() {
+    private val PARALLEL_THREADS_TO_START = 8
 
-        val PARALLEL_THREADS_TO_START = 16
+    fun testParallelDaemonStart() {
 
         val doneLatch = CountDownLatch(PARALLEL_THREADS_TO_START)
 
