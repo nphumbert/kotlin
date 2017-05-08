@@ -101,9 +101,7 @@ class KtLightMutabilityPlatformWrapper(
 
     private fun calcMethods() = javaBaseClass.methods.flatMap { methodWrappers(it) } + additionalMethods()
 
-    override fun getOwnMethods(): List<PsiMethod> {
-        return _methods
-    }
+    override fun getOwnMethods() = _methods
 
     private fun methodWrappers(method: PsiMethod): List<PsiMethod> {
         val methodName = method.name
@@ -138,8 +136,10 @@ class KtLightMutabilityPlatformWrapper(
             return listOf(finalBridgeWithObject, abstractKotlinVariantWithGeneric)
         }
 
-        if (methodName == "remove" && method.parameterList.parameters.singleOrNull()?.type == PsiPrimitiveType.INT) {
-            return listOf(method.finalBridge())
+        if (methodName == "remove") {
+            if (method.parameterList.parameters.singleOrNull()?.type?.let { !TypeUtils.isJavaLangObject(it) } ?: return emptyList()) {
+                return listOf(method.finalBridge())
+            }
         }
 
         val finalBridgeWithObject = method.finalBridge()
