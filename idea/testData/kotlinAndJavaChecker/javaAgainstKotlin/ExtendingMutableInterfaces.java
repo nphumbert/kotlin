@@ -8,13 +8,14 @@ public class EtendingMutableInterfaces {
 
         }
 
-        public static class ExtendCList1<E> extends CMutableList<E> {
-
-        }
-
-        public static class ExtendCList2<E> extends CMutableList<String> {
-
-        }
+        // Compiler bug causes remove(int) to clash https://youtrack.jetbrains.com/issue/KT-17782
+        //public static class ExtendCList1<E> extends CMutableList<E> {
+        //
+        //}
+        //
+        //public static class ExtendCList2<E> extends CMutableList<String> {
+        //
+        //}
 
         public static class ExtendSList extends SMutableList {
 
